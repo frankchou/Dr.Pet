@@ -9,6 +9,13 @@ datasource db {
   provider = "sqlite"
 }
 
+model User {
+  id          String   @id @default(cuid())
+  nickname    String   @unique
+  createdAt   DateTime @default(now())
+  pets        Pet[]
+}
+
 model Pet {
   id             String         @id @default(cuid())
   name           String
@@ -22,6 +29,8 @@ model Pet {
   medicalHistory String?
   mainProblems   String         @default("[]")
   avatar         String?
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id])
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   symptoms       SymptomEntry[]
@@ -31,6 +40,9 @@ model Pet {
   chatMessages   ChatMessage[]
   weeklyTasks          WeeklyTask[]
   nutritionAnalyses    NutritionAnalysis[]
+  petProducts          PetProduct[]
+  productReactions     ProductReaction[]
+  communityRecs        CommunityRec[]
 }
 
 model SymptomEntry {
@@ -56,6 +68,10 @@ model Product {
   photos         String         @default("[]")
   createdAt      DateTime       @default(now())
   usages         ProductUsage[]
+  petProducts    PetProduct[]
+  reactions      ProductReaction[]
+  communityRecsFor   CommunityRec[] @relation("BadProduct")
+  communityRecsRec   CommunityRec[] @relation("RecommendedProduct")
 }
 
 model ProductUsage {
@@ -69,6 +85,54 @@ model ProductUsage {
   amountLevel String?
   notes       String?
   createdAt   DateTime @default(now())
+}
+
+// Pet's managed product list (固定清單 / 試用清單)
+model PetProduct {
+  id          String   @id @default(cuid())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  listType    String   // "fixed" | "trial"
+  trialReason String?  // only for listType="trial"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Daily reaction record per product
+model ProductReaction {
+  id          String   @id @default(cuid())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  date        String   // "YYYY-MM-DD"
+  rating      String   // "good" | "ok" | "bad"
+  notes       String?
+  sharedAt    DateTime? // non-null = shared to community pool
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([petId, productId, date])
+}
+
+// Community recommendation cards shown to users
+model CommunityRec {
+  id                   String   @id @default(cuid())
+  forPetId             String
+  forPet               Pet      @relation(fields: [forPetId], references: [id], onDelete: Cascade)
+  badProductId         String
+  badProduct           Product  @relation("BadProduct", fields: [badProductId], references: [id])
+  recommendedProductId String
+  recommendedProduct   Product  @relation("RecommendedProduct", fields: [recommendedProductId], references: [id])
+  symptomTypes         String   @default("[]") // JSON array of symptom types
+  basedOnCount         Int      @default(0)    // number of similar-pet good reactions
+  fromAI               Boolean  @default(false)
+  aiRationale          String?
+  dismissed            Boolean  @default(false)
+  createdAt            DateTime @default(now())
 }
 
 model Document {

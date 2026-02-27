@@ -16,6 +16,17 @@ interface Usage {
   product: Product
 }
 interface Pet { id: string; name: string; species: string }
+interface PetProduct {
+  id: string; listType: string; trialReason?: string | null
+  productId: string; product: Product
+}
+interface ProductReaction {
+  id: string; productId: string; rating: string; notes?: string | null
+}
+interface CommunityRec {
+  id: string; fromAI: boolean; basedOnCount: number; aiRationale?: string | null
+  badProduct: Product; recommendedProduct: Product
+}
 
 const TYPE_ORDER = ['feed', 'can', 'snack', 'supplement', 'dental', 'shampoo', 'other']
 const TYPE_EMOJIS: Record<string, string> = {
@@ -172,6 +183,140 @@ function UsageEditForm({
   )
 }
 
+// ─── Daily Reaction Section ───────────────────────────────────────────────────
+function DailyReactionSection({
+  petProducts, dayReactions, reactionSaving, onRate,
+}: {
+  petProducts: PetProduct[]
+  dayReactions: ProductReaction[]
+  reactionSaving: string | null
+  onRate: (productId: string, rating: string) => void
+}) {
+  if (petProducts.length === 0) return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+      <p className="text-sm font-semibold text-gray-700 mb-0.5">今日吃後感想</p>
+      <p className="text-xs text-gray-400">
+        尚未建立產品清單，
+        <Link href="/products" className="text-[#4F7CFF] underline-offset-2">前往新增</Link>
+      </p>
+    </div>
+  )
+
+  const RATING_CONFIG = {
+    good: { emoji: '👍', active: 'bg-green-100 text-green-700 ring-1 ring-green-300', inactive: 'bg-gray-50 text-gray-400' },
+    ok:   { emoji: '😐', active: 'bg-yellow-100 text-yellow-700 ring-1 ring-yellow-300', inactive: 'bg-gray-50 text-gray-400' },
+    bad:  { emoji: '👎', active: 'bg-red-100 text-red-600 ring-1 ring-red-300', inactive: 'bg-gray-50 text-gray-400' },
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-700">今日吃後感想</p>
+        <Link href="/products" className="text-xs text-[#4F7CFF]">管理清單</Link>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {petProducts.map((pp) => {
+          const reaction = dayReactions.find((r) => r.productId === pp.productId)
+          const isSaving = reactionSaving === pp.productId
+          return (
+            <div key={pp.id} className="px-4 py-3 flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {pp.listType === 'trial' && (
+                    <span className="text-[9px] bg-orange-100 text-[#FF8C42] px-1.5 py-0.5 rounded font-medium">試用</span>
+                  )}
+                  <span className="text-sm font-medium text-gray-800 truncate">{pp.product.name}</span>
+                </div>
+                {pp.listType === 'trial' && pp.trialReason && (
+                  <p className="text-[10px] text-gray-400 mt-0.5 truncate">原因：{pp.trialReason}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {isSaving ? (
+                  <div className="w-4 h-4 border-2 border-gray-200 border-t-[#4F7CFF] rounded-full animate-spin" />
+                ) : (
+                  (Object.keys(RATING_CONFIG) as ('good' | 'ok' | 'bad')[]).map((r) => {
+                    const cfg = RATING_CONFIG[r]
+                    const isActive = reaction?.rating === r
+                    return (
+                      <button
+                        key={r}
+                        onClick={() => onRate(pp.productId, r)}
+                        className={`w-8 h-8 rounded-xl text-sm flex items-center justify-center transition-all ${isActive ? cfg.active : cfg.inactive}`}
+                      >
+                        {cfg.emoji}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Community Recs Panel ─────────────────────────────────────────────────────
+function CommunityRecsPanel({
+  recs, onDismiss,
+}: {
+  recs: CommunityRec[]
+  onDismiss: (recId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  if (recs.length === 0) return null
+
+  return (
+    <div className="bg-gradient-to-br from-[#4F7CFF]/10 to-purple-50 rounded-2xl border border-[#4F7CFF]/20 overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">🌐</span>
+          <span className="text-sm font-semibold text-gray-800">社群推薦</span>
+          <span className="text-[10px] bg-[#4F7CFF] text-white px-1.5 py-0.5 rounded-full font-medium">{recs.length}</span>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+          className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2">
+          {recs.map((rec) => (
+            <div key={rec.id} className={`bg-white rounded-xl p-3 border ${rec.fromAI ? 'border-purple-100' : 'border-gray-100'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    {rec.fromAI ? (
+                      <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">AI 建議</span>
+                    ) : (
+                      <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">社群推薦 · {rec.basedOnCount} 筆</span>
+                    )}
+                    <span className="text-[10px] text-gray-400">取代「{rec.badProduct.name}」</span>
+                  </div>
+                  {rec.fromAI ? (
+                    <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">{rec.aiRationale}</p>
+                  ) : (
+                    <p className="text-sm font-semibold text-gray-800">{rec.recommendedProduct.name}</p>
+                  )}
+                </div>
+                <button onClick={() => onDismiss(rec.id)} className="text-gray-300 hover:text-gray-500 shrink-0 text-sm">
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function LogPage() {
   const [pets, setPets]               = useState<Pet[]>([])
@@ -182,6 +327,10 @@ export default function LogPage() {
   const [editingUsageId, setEditingUsageId] = useState<string | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [petProducts, setPetProducts] = useState<PetProduct[]>([])
+  const [dayReactions, setDayReactions] = useState<ProductReaction[]>([])
+  const [reactionSaving, setReactionSaving] = useState<string | null>(null)
+  const [communityRecs, setCommunityRecs] = useState<CommunityRec[]>([])
 
   useEffect(() => {
     fetch('/api/pets').then((r) => r.json()).then((data: Pet[]) => {
@@ -201,7 +350,65 @@ export default function LogPage() {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { if (currentPetId) loadUsages(currentPetId) }, [currentPetId, loadUsages])
+  const loadPetProducts = useCallback(async (petId: string) => {
+    const res = await fetch(`/api/pet-products?petId=${petId}`)
+    const data = await res.json()
+    setPetProducts(Array.isArray(data) ? data : [])
+  }, [])
+
+  const loadDayReactions = useCallback(async (petId: string, date: string) => {
+    const res = await fetch(`/api/reactions?petId=${petId}&date=${date}`)
+    const data = await res.json()
+    setDayReactions(Array.isArray(data) ? data : [])
+  }, [])
+
+  const loadCommunityRecs = useCallback(async (petId: string) => {
+    const res = await fetch(`/api/community/recs?petId=${petId}`)
+    const data = await res.json()
+    setCommunityRecs(Array.isArray(data) ? data : [])
+  }, [])
+
+  const saveReaction = async (productId: string, rating: string) => {
+    if (!selectedDate || !currentPetId) return
+    setReactionSaving(productId)
+    // Optimistic update
+    setDayReactions((prev) => {
+      const exists = prev.find((r) => r.productId === productId)
+      if (exists) return prev.map((r) => r.productId === productId ? { ...r, rating } : r)
+      return [...prev, { id: 'tmp', productId, rating }]
+    })
+    await fetch('/api/reactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ petId: currentPetId, productId, date: selectedDate, rating }),
+    })
+    await Promise.all([
+      loadDayReactions(currentPetId, selectedDate),
+      loadCommunityRecs(currentPetId),
+    ])
+    setReactionSaving(null)
+  }
+
+  const dismissRec = async (recId: string) => {
+    setCommunityRecs((prev) => prev.filter((r) => r.id !== recId))
+    await fetch('/api/community/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recId }),
+    })
+  }
+
+  useEffect(() => {
+    if (currentPetId) {
+      loadUsages(currentPetId)
+      loadPetProducts(currentPetId)
+      loadCommunityRecs(currentPetId)
+    }
+  }, [currentPetId, loadUsages, loadPetProducts, loadCommunityRecs])
+
+  useEffect(() => {
+    if (currentPetId && selectedDate) loadDayReactions(currentPetId, selectedDate)
+  }, [currentPetId, selectedDate, loadDayReactions])
 
   const deleteUsage = async (id: string) => {
     if (!confirm('確定刪除此使用記錄？（產品資料不會刪除）')) return
@@ -295,6 +502,9 @@ export default function LogPage() {
               ))}
             </div>
 
+            {/* Community Recommendations */}
+            <CommunityRecsPanel recs={communityRecs} onDismiss={dismissRec} />
+
             {/* Calendar */}
             <MonthCalendar
               usages={usages}
@@ -321,6 +531,16 @@ export default function LogPage() {
                   ✕
                 </button>
               </div>
+            )}
+
+            {/* Daily reaction section — shown when a date is selected */}
+            {selectedDate && (
+              <DailyReactionSection
+                petProducts={petProducts}
+                dayReactions={dayReactions}
+                reactionSaving={reactionSaving}
+                onRate={saveReaction}
+              />
             )}
 
             {/* 選取日期但無記錄 */}

@@ -66,6 +66,8 @@ function NewLogForm() {
     date: dateParam,
     frequency: '', amountLevel: '', notes: '',
   })
+  const [addToList, setAddToList] = useState<'none' | 'fixed' | 'trial'>('none')
+  const [trialReason, setTrialReason] = useState('')
 
   useEffect(() => {
     fetch('/api/pets').then((r) => r.json()).then((data: Pet[]) => {
@@ -146,6 +148,18 @@ function NewLogForm() {
         body: JSON.stringify({ ...usageForm, productId }),
       })
       if (!usageRes.ok) throw new Error('建立記錄失敗')
+      // Optionally add to pet's product list
+      if (addToList !== 'none' && usageForm.petId) {
+        await fetch('/api/pet-products', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            petId: usageForm.petId,
+            productId,
+            listType: addToList,
+            trialReason: addToList === 'trial' ? trialReason : null,
+          }),
+        })
+      }
       router.push('/log')
     } catch (err) {
       setError(err instanceof Error ? err.message : '建立失敗')
@@ -381,6 +395,41 @@ function NewLogForm() {
           <Select label="使用頻率" value={usageForm.frequency} onChange={(e) => setUsageForm((p) => ({ ...p, frequency: e.target.value }))} options={FREQUENCY_OPTIONS} />
           <Select label="用量" value={usageForm.amountLevel} onChange={(e) => setUsageForm((p) => ({ ...p, amountLevel: e.target.value }))} options={AMOUNT_OPTIONS} />
           <Textarea label="備註" value={usageForm.notes} onChange={(e) => setUsageForm((p) => ({ ...p, notes: e.target.value }))} placeholder="例如：寵物的反應、是否喜歡吃..." />
+
+          {/* Add to product list */}
+          <div className="bg-gray-50 rounded-2xl p-3 space-y-2">
+            <p className="text-sm font-medium text-gray-700">加入產品清單？</p>
+            <div className="flex gap-2">
+              {([
+                { value: 'none',  label: '不加入' },
+                { value: 'fixed', label: '🏠 固定清單' },
+                { value: 'trial', label: '🧪 試用清單' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAddToList(opt.value)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                    addToList === opt.value
+                      ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]'
+                      : 'bg-white text-gray-500 border-gray-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {addToList === 'trial' && (
+              <input
+                type="text"
+                value={trialReason}
+                onChange={(e) => setTrialReason(e.target.value)}
+                placeholder="試用原因（選填）：例如改善皮膚問題…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+              />
+            )}
+          </div>
+
           <div className="flex gap-3">
             <Button type="button" variant="secondary" size="lg" className="flex-1" onClick={() => setStep(1)}>上一步</Button>
             <Button type="submit" size="lg" className="flex-1" loading={loading}>儲存記錄</Button>

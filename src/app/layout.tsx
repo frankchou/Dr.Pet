@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import BottomNav from '@/components/layout/BottomNav'
+import ClientShell from '@/components/layout/ClientShell'
 
 export const metadata: Metadata = {
   title: '寵物隨行醫師 Dr. Pet',
@@ -17,7 +18,9 @@ export default function RootLayout({
       <body className="antialiased">
         <div className="min-h-screen bg-[#F8F9FF]">
           <div className="max-w-[480px] mx-auto min-h-screen relative">
-            <main className="pb-20">{children}</main>
+            <ClientShell>
+              <main className="pb-20">{children}</main>
+            </ClientShell>
           </div>
         </div>
         <BottomNav />
