@@ -445,11 +445,33 @@ export default function AnalysisPage() {
         })
       }
     }
+    // 有毒／警示成分的產品
     result.toxicItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'danger')))
     result.warningItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'warning')))
-    result.cautionItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'caution')))
+
+    // 含有 AI 警示或危險營養素的產品（例如磷超標）
+    if (nutritionAiResult && nutritionByProduct.length > 0) {
+      const riskNutrients = nutritionAiResult.items.filter(
+        (i) => i.status === 'warning' || i.status === 'danger'
+      )
+      riskNutrients.forEach((nutrientItem) => {
+        nutritionByProduct.forEach((prodNutr) => {
+          const hasFact = prodNutr.facts.some((f) => f.name === nutrientItem.nutrient)
+          if (!hasFact) return
+          const prod = result.analyzedProducts.find(
+            (p) => p.id === prodNutr.productId || p.name === prodNutr.productName
+          )
+          const displayName = prod
+            ? `${prod.brand ? prod.brand + ' ' : ''}${prod.name}`
+            : prodNutr.productName
+          const level = nutrientItem.status === 'danger' ? 'danger' : 'warning'
+          add(displayName, nutrientItem.nutrient, level)
+        })
+      })
+    }
+
     return Array.from(map.values())
-  }, [result])
+  }, [result, nutritionAiResult, nutritionByProduct])
 
   // Collect all unique nutrient names across all products
   const allNutrientNames = Array.from(
@@ -690,33 +712,61 @@ export default function AnalysisPage() {
                       )}
 
                       {recResult && recResult.length > 0 && (
-                        <div className="divide-y divide-gray-50">
-                          {recResult.map((rec, ri) => (
-                            <div key={ri} className="px-4 py-3 space-y-2">
-                              <p className="text-xs font-semibold text-gray-600">替換：{rec.forProduct}</p>
-                              {rec.alternatives.map((alt, ai) => (
-                                <div key={ai} className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1.5">
-                                  <p className="text-xs font-semibold text-[#4F7CFF]">→ {alt.type}</p>
-                                  <p className="text-xs text-gray-600 leading-relaxed">{alt.reason}</p>
-                                  {alt.keyFeatures.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {alt.keyFeatures.map((f, fi) => (
-                                        <span key={fi} className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">✓ {f}</span>
+                        <div className="divide-y divide-gray-100">
+                          {recResult.map((rec, ri) => {
+                            const prodInfo = riskyProductsForRec.find(
+                              (p) => p.name === rec.forProduct || `${p.brand ? p.brand + ' ' : ''}${p.name}` === rec.forProduct
+                            )
+                            const isD = prodInfo?.riskLevel === 'danger'
+                            return (
+                              <div key={ri} className="px-4 pt-4 pb-3 space-y-3">
+                                {/* ── 目前使用的產品（有問題的） ── */}
+                                <div className={`rounded-xl p-3 border ${isD ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}>
+                                  <p className={`text-[10px] font-semibold mb-1 ${isD ? 'text-red-500' : 'text-orange-500'}`}>
+                                    {isD ? '⛔ 有毒成分 — 建議替換' : '⚠️ 警示成分 — 建議替換'}
+                                  </p>
+                                  <p className="text-sm font-bold text-gray-800">{prodInfo?.name || rec.forProduct}</p>
+                                  {prodInfo?.brand && <p className="text-xs text-gray-500 mt-0.5">{prodInfo.brand}</p>}
+                                  {prodInfo?.risks && prodInfo.risks.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      <span className="text-[10px] text-gray-400 self-center">問題成分：</span>
+                                      {prodInfo.risks.map((r, rIdx) => (
+                                        <span key={rIdx} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isD ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>{r}</span>
                                       ))}
                                     </div>
                                   )}
-                                  {alt.avoid.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {alt.avoid.map((a, ai2) => (
-                                        <span key={ai2} className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">✕ 避開 {a}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <p className="text-[10px] text-gray-400 leading-relaxed">💡 {alt.searchTip}</p>
                                 </div>
-                              ))}
-                            </div>
-                          ))}
+
+                                {/* ── 建議替代方向 ── */}
+                                <div>
+                                  <p className="text-[10px] font-semibold text-gray-400 mb-1.5 px-0.5">建議替代方向</p>
+                                  <div className="space-y-2">
+                                    {rec.alternatives.map((alt, ai) => (
+                                      <div key={ai} className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1.5">
+                                        <p className="text-xs font-semibold text-[#4F7CFF]">{alt.type}</p>
+                                        <p className="text-xs text-gray-600 leading-relaxed">{alt.reason}</p>
+                                        {alt.keyFeatures.length > 0 && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {alt.keyFeatures.map((f, fi) => (
+                                              <span key={fi} className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">✓ {f}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {alt.avoid.length > 0 && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {alt.avoid.map((a, ai2) => (
+                                              <span key={ai2} className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">✕ 避開 {a}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <p className="text-[10px] text-gray-400 leading-relaxed">💡 {alt.searchTip}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
                           <div className="px-4 py-2">
                             <button
                               onClick={() => runRecommend(riskyProductsForRec)}
