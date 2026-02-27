@@ -29,6 +29,7 @@ interface AnalysisResponse {
 interface NutritionAiItem {
   nutrient: string
   status: 'safe' | 'caution' | 'warning' | 'danger'
+  summary?: string
   assessment: string
   riskDetails: string
   recommendation: string
@@ -93,14 +94,16 @@ function NutrientCard({ item, cfg, isRisk }: {
           <p className="font-semibold text-sm text-[#1a1a2e] flex-1">{item.nutrient}</p>
           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
         </div>
-        {/* Risk summary — red highlight if warning/danger, else show assessment */}
-        {isRisk && item.riskDetails ? (
-          <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 leading-relaxed">
-            ⚠️ {item.riskDetails}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{item.assessment}</p>
-        )}
+        {/* Summary — AI-generated condensed summary from second pass */}
+        {item.summary ? (
+          isRisk ? (
+            <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 leading-relaxed">
+              ⚠️ {item.summary}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-600 leading-relaxed">{item.summary}</p>
+          )
+        ) : null}
         {/* 詳細資訊 toggle */}
         <div className="flex justify-end mt-1.5">
           <button
@@ -847,7 +850,7 @@ export default function AnalysisPage() {
                             {/* Reference source */}
                             <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[10px] text-gray-400 leading-relaxed">
                               <span className="font-medium text-gray-500">資料參考來源：</span>
-                              世界動物衛生組織、世界獸醫協會、WSAVA、CAPC、OFA、APOP、NRC、AAFCO、FEDIAF、PNA、AAVN、Waltham Petcare Science Institute、農業部動植物防疫檢疫署、農業部食品藥物管理署、農業部、中華民國獸醫師公會全國聯合會、台灣小動物獸醫學會、台灣獸醫內科醫學會、台灣獸醫外科醫學會、國立臺灣大學獸醫專業學院、國立中興大學獸醫學系
+                              世界動物衛生組織、世界獸醫協會、WSAVA、CAPC、OFA、APOP、NRC、AAFCO（美國飼料管理協會）、FEDIAF、PNA、AAVN、Waltham Petcare Science Institute、農業部動植物防疫檢疫署、農業部食品藥物管理署、農業部、中華民國獸醫師公會全國聯合會、台灣小動物獸醫學會、台灣獸醫內科醫學會、台灣獸醫外科醫學會、國立臺灣大學獸醫專業學院、國立中興大學獸醫學系
                             </div>
                           </div>
                         )
@@ -860,6 +863,7 @@ export default function AnalysisPage() {
                         <p>• <span className="text-orange-600 font-medium">橘色/偏高</span>：超過 AAFCO 建議上限</p>
                         <p>• <span className="text-blue-500 font-medium">藍色/偏低</span>：低於 AAFCO 最低需求</p>
                         <p>• AI 分析結合寵物體型與物種，提供個人化建議，僅供參考</p>
+                        <p className="text-gray-400 pt-0.5">※ AAFCO = 美國飼料管理協會（Association of American Feed Control Officials）</p>
                       </div>
                     </>
                   )}

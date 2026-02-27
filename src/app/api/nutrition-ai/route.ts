@@ -160,6 +160,46 @@ status 值只能是以下四種：
 
     const analysis = JSON.parse(jsonMatch[0])
 
+    // ── Step 2: 用詳細資料再生成重點摘要 ──────────────────────────────────────
+    try {
+      const summaryInput = (analysis.items as Array<{
+        nutrient: string; status: string; assessment: string; riskDetails: string; recommendation: string
+      }>).map((item) => ({
+        nutrient: item.nutrient,
+        status: item.status,
+        assessment: item.assessment,
+        riskDetails: item.riskDetails,
+        recommendation: item.recommendation,
+      }))
+
+      const summaryPrompt = `根據以下每個營養素的詳細評估結果，為每個營養素各生成一句話重點摘要（最多25字）。
+要求：直接說明目前狀態與最關鍵的風險點或安全點，例如「數值正常，無需調整」或「偏高可能加重腎臟負擔，建議降低攝取」。
+
+評估資料：
+${JSON.stringify(summaryInput, null, 2)}
+
+只回傳 JSON，不加任何其他文字或 markdown：
+{"summaries": {"營養素名稱": "摘要內容", ...}}`
+
+      const summaryResponse = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: summaryPrompt }],
+      })
+
+      const summaryText = summaryResponse.content[0].type === 'text' ? summaryResponse.content[0].text : ''
+      const summaryMatch = summaryText.match(/\{[\s\S]*\}/)
+      if (summaryMatch) {
+        const { summaries } = JSON.parse(summaryMatch[0]) as { summaries: Record<string, string> }
+        analysis.items = (analysis.items as Array<{ nutrient: string } & Record<string, unknown>>).map((item) => ({
+          ...item,
+          summary: summaries[item.nutrient] ?? '',
+        }))
+      }
+    } catch (e) {
+      console.warn('Summary generation failed, skipping:', e)
+    }
+
     // 儲存分析結果至 DB（保留最近 3 筆，刪除舊的）
     const oldRecords = await prisma.nutritionAnalysis.findMany({
       where: { petId },
