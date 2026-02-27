@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 const navItems = [
   {
@@ -65,10 +66,17 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  // Clear pending state once the pathname actually changes
+  useEffect(() => {
+    setPendingHref(null)
+  }, [pathname])
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
+    const activePath = pendingHref ?? pathname
+    if (href === '/') return activePath === '/'
+    return activePath.startsWith(href)
   }
 
   return (
@@ -78,6 +86,7 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => setPendingHref(item.href)}
             className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs transition-colors ${
               isActive(item.href)
                 ? 'text-[#4F7CFF]'

@@ -332,10 +332,10 @@ export default function ProductsPage() {
 
       {/* ── Add product modal ── */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 pb-[76px]"
           onClick={() => setShowAdd(false)}>
-          <div className="w-full max-w-[480px] bg-white rounded-t-3xl flex flex-col"
-            style={{ maxHeight: '80vh' }}
+          <div className="w-full max-w-[480px] bg-white rounded-3xl flex flex-col overflow-hidden"
+            style={{ height: '72vh' }}
             onClick={e => e.stopPropagation()}>
 
             {/* Modal header — fixed */}

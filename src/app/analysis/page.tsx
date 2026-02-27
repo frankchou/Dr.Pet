@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { productTypeLabel } from '@/lib/utils'
@@ -422,6 +422,35 @@ export default function AnalysisPage() {
 
   const nutritionByProduct: ProductNutrition[] = (data as AnalysisResponse | null)?.nutritionByProduct ?? []
 
+  // 彙整有風險的產品（useMemo 確保穩定，供 runRecommend 使用）
+  const riskyProductsForRec = useMemo(() => {
+    if (!result) return []
+    const map = new Map<string, { name: string; brand?: string; type: string; risks: string[]; riskLevel: 'danger' | 'warning' | 'caution' }>()
+    const priority: Record<string, number> = { danger: 3, warning: 2, caution: 1 }
+    const add = (productDisplayName: string, ingredientName: string, level: 'danger' | 'warning' | 'caution') => {
+      const existing = map.get(productDisplayName)
+      if (existing) {
+        if (!existing.risks.includes(ingredientName)) existing.risks.push(ingredientName)
+        if (priority[level] > priority[existing.riskLevel]) existing.riskLevel = level
+      } else {
+        const prod = result.analyzedProducts.find(
+          (p) => `${p.brand ? p.brand + ' ' : ''}${p.name}` === productDisplayName || p.name === productDisplayName
+        )
+        map.set(productDisplayName, {
+          name: prod?.name || productDisplayName,
+          brand: prod?.brand ?? undefined,
+          type: prod?.type || 'other',
+          risks: [ingredientName],
+          riskLevel: level,
+        })
+      }
+    }
+    result.toxicItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'danger')))
+    result.warningItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'warning')))
+    result.cautionItems.forEach((item) => item.foundIn.forEach((p) => add(p, item.displayName, 'caution')))
+    return Array.from(map.values())
+  }, [result])
+
   // Collect all unique nutrient names across all products
   const allNutrientNames = Array.from(
     new Set(nutritionByProduct.flatMap((p) => p.facts.map((f) => f.name)))
@@ -631,35 +660,7 @@ export default function AnalysisPage() {
                 )}
 
                 {/* ── AI 產品推薦 ── */}
-                {(() => {
-                  // 彙整有問題的產品
-                  const riskyProductMap = new Map<string, { name: string; brand?: string; type: string; risks: string[]; riskLevel: 'danger' | 'warning' | 'caution' }>()
-                  const addRisk = (productName: string, ingredientName: string, level: 'danger' | 'warning' | 'caution') => {
-                    const existing = riskyProductMap.get(productName)
-                    const priority = { danger: 3, warning: 2, caution: 1 }
-                    if (existing) {
-                      existing.risks.push(ingredientName)
-                      if (priority[level] > priority[existing.riskLevel]) existing.riskLevel = level
-                    } else {
-                      const prod = result.analyzedProducts.find(
-                        (p) => `${p.brand ? p.brand + ' ' : ''}${p.name}` === productName || p.name === productName
-                      )
-                      riskyProductMap.set(productName, {
-                        name: prod?.name || productName,
-                        brand: prod?.brand ?? undefined,
-                        type: prod?.type || 'other',
-                        risks: [ingredientName],
-                        riskLevel: level,
-                      })
-                    }
-                  }
-                  result.warningItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'warning')))
-                  result.cautionItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'caution')))
-                  result.toxicItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'danger')))
-                  const riskyProducts = Array.from(riskyProductMap.values())
-                  if (riskyProducts.length === 0 && !recResult && !recLoading) return null
-
-                  return (
+                {(riskyProductsForRec.length > 0 || recResult || recLoading) && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                       <div className="px-4 pt-4 pb-3">
                         <div className="flex items-center gap-2 mb-1">
@@ -672,7 +673,7 @@ export default function AnalysisPage() {
                       {!recResult && !recLoading && (
                         <div className="px-4 pb-4">
                           <button
-                            onClick={() => runRecommend(riskyProducts)}
+                            onClick={() => runRecommend(riskyProductsForRec)}
                             className="w-full py-3 bg-gradient-to-r from-[#4F7CFF] to-[#6B8FFF] text-white rounded-xl font-medium text-sm shadow-sm active:opacity-90"
                           >
                             取得 AI 替代品建議
@@ -718,7 +719,7 @@ export default function AnalysisPage() {
                           ))}
                           <div className="px-4 py-2">
                             <button
-                              onClick={() => runRecommend(riskyProducts)}
+                              onClick={() => runRecommend(riskyProductsForRec)}
                               className="text-xs text-[#4F7CFF] font-medium"
                             >
                               重新取得建議
@@ -728,7 +729,7 @@ export default function AnalysisPage() {
                       )}
                     </div>
                   )
-                })()}
+                }
               </div>
             )}
 

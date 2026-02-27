@@ -79,12 +79,14 @@ ${productLines}
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const match = text.match(/\{[\s\S]*\}/)
+    // Strip markdown code fences if present, then extract JSON object
+    const cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim()
+    const match = cleaned.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('AI 回應格式錯誤')
 
     const { recommendations } = JSON.parse(match[0])

@@ -41,8 +41,8 @@ export default function ClientShell({ children }: { children: React.ReactNode })
 
   if (needsSetup) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-        <div className="w-full max-w-[480px] bg-white rounded-t-3xl px-6 pt-8 pb-10 shadow-xl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+        <div className="w-full max-w-[400px] bg-white rounded-3xl px-6 pt-8 pb-8 shadow-xl">
           <div className="text-center mb-6">
             <div className="text-4xl mb-3">🐾</div>
             <h1 className="text-xl font-bold text-gray-900">歡迎使用寵物隨行醫師</h1>
