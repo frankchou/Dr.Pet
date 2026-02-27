@@ -678,7 +678,9 @@ export default function AnalysisPage() {
                               <th className="text-center px-3 py-2 font-medium text-gray-600 min-w-[60px]">合計</th>
                               <th className="text-left px-3 py-2 font-medium text-gray-500 min-w-[100px]">來源產品</th>
                               <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[70px]">建議範圍</th>
-                              <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[50px]">狀態</th>
+                              {nutritionAiResult && (
+                                <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[50px]">AI 狀態</th>
+                              )}
                             </tr>
                           </thead>
                           <tbody>
@@ -695,12 +697,31 @@ export default function AnalysisPage() {
                               const sourceProducts = nutritionByProduct
                                 .filter((p) => p.facts.some((f) => f.name === name))
                                 .map((p) => p.productName)
+
+                              // AI 狀態（以 nutrient 名稱對應）
+                              const aiItem = nutritionAiResult?.items.find((i) => i.nutrient === name)
+                              const aiStatus = aiItem?.status
+
+                              // 數值欄顏色：有 AI 結果用 AI 狀態，否則用閾值
+                              const valueColor = aiStatus
+                                ? ({ danger: 'text-red-600', warning: 'text-orange-600', caution: 'text-yellow-600', safe: 'text-[#1a1a2e]' } as Record<string, string>)[aiStatus]
+                                : (isWarn ? 'text-orange-600' : isLow ? 'text-blue-500' : 'text-[#1a1a2e]')
+                              const showWarnIcon = aiStatus === 'warning' || aiStatus === 'danger' || (!aiStatus && isWarn)
+
+                              // AI 狀態 badge
+                              const aiBadge: Record<string, ReturnType<() => React.JSX.Element>> = {
+                                danger:  <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-medium">危險</span>,
+                                warning: <span className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-medium">警示</span>,
+                                caution: <span className="inline-block px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-medium">留意</span>,
+                                safe:    <span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-medium">正常</span>,
+                              }
+
                               return (
                                 <tr key={name} className="border-b border-gray-50 last:border-0">
                                   <td className="px-3 py-2 font-medium text-gray-700">{name}</td>
-                                  <td className={`text-center px-3 py-2 font-bold ${isWarn ? 'text-orange-600' : isLow ? 'text-blue-500' : 'text-[#1a1a2e]'}`}>
+                                  <td className={`text-center px-3 py-2 font-bold ${valueColor}`}>
                                     {totalValue}{unit}
-                                    {isWarn && <span className="ml-0.5">⚠️</span>}
+                                    {showWarnIcon && <span className="ml-0.5">⚠️</span>}
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">
                                     {sourceProducts.length > 0 ? (
@@ -716,15 +737,11 @@ export default function AnalysisPage() {
                                     )}
                                   </td>
                                   <td className="text-center px-3 py-2 text-gray-400 text-[11px]">{rangeLabel}</td>
-                                  <td className="text-center px-3 py-2">
-                                    {isWarn ? (
-                                      <span className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-medium">偏高</span>
-                                    ) : isLow ? (
-                                      <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[10px] font-medium">偏低</span>
-                                    ) : (
-                                      <span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-medium">正常</span>
-                                    )}
-                                  </td>
+                                  {nutritionAiResult && (
+                                    <td className="text-center px-3 py-2">
+                                      {aiStatus ? aiBadge[aiStatus] : <span className="text-gray-300 text-[10px]">—</span>}
+                                    </td>
+                                  )}
                                 </tr>
                               )
                             })}
