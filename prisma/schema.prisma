@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Pet {
+  id             String         @id @default(cuid())
+  name           String
+  species        String
+  breed          String?
+  sex            String
+  birthday       DateTime?
+  weight         Float?
+  isNeutered     Boolean        @default(false)
+  allergies      String?
+  medicalHistory String?
+  mainProblems   String         @default("[]")
+  avatar         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  symptoms       SymptomEntry[]
+  productUsages  ProductUsage[]
+  documents      Document[]
+  insights       AIInsight[]
+  chatMessages   ChatMessage[]
+  weeklyTasks          WeeklyTask[]
+  nutritionAnalyses    NutritionAnalysis[]
+}
+
+model SymptomEntry {
+  id          String   @id @default(cuid())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  symptomType String
+  severity    Int
+  side        String?
+  notes       String?
+  photos      String   @default("[]")
+  createdAt   DateTime @default(now())
+}
+
+model Product {
+  id             String         @id @default(cuid())
+  type           String
+  name           String
+  brand          String?
+  variant        String?
+  ingredientText String?
+  ingredientJson String?
+  photos         String         @default("[]")
+  createdAt      DateTime       @default(now())
+  usages         ProductUsage[]
+}
+
+model ProductUsage {
+  id          String   @id @default(cuid())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  date        DateTime @default(now())
+  frequency   String?
+  amountLevel String?
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id                  String   @id @default(cuid())
+  petId               String
+  pet                 Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  type                String
+  photos              String   @default("[]")
+  extractedText       String?
+  extractedStructured String?
+  createdAt           DateTime @default(now())
+}
+
+model AIInsight {
+  id                 String   @id @default(cuid())
+  petId              String
+  pet                Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  symptomType        String?
+  suspectedTriggers  String   @default("[]")
+  helpfulFactors     String   @default("[]")
+  confidence         String   @default("low")
+  rationale          String?
+  recommendedActions String   @default("[]")
+  createdAt          DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  petId     String
+  pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model WeeklyTask {
+  id          String    @id @default(cuid())
+  petId       String
+  pet         Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  completed   Boolean   @default(false)
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model NutritionAnalysis {
+  id           String   @id @default(cuid())
+  petId        String
+  pet          Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  resultJson   String
+  productCount Int
+  createdAt    DateTime @default(now())
+}
