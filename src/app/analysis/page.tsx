@@ -74,6 +74,63 @@ const PRIORITY_CONFIG = {
   low:    { label: '可考慮',   bg: 'bg-blue-50',   border: 'border-blue-200',   dot: 'bg-blue-400' },
 }
 
+// ── NutrientCard: summary + expandable details ────────────────────────────────
+interface NutrientCfg {
+  label: string; bg: string; border: string; badge: string; icon: string
+}
+function NutrientCard({ item, cfg, isRisk }: {
+  item: NutritionAiItem
+  cfg: NutrientCfg
+  isRisk: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} overflow-hidden`}>
+      {/* ── Summary row ── */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-base leading-none">{cfg.icon}</span>
+          <p className="font-semibold text-sm text-[#1a1a2e] flex-1">{item.nutrient}</p>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
+        </div>
+        {/* Risk summary — red highlight if warning/danger, else show assessment */}
+        {isRisk && item.riskDetails ? (
+          <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 leading-relaxed">
+            ⚠️ {item.riskDetails}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{item.assessment}</p>
+        )}
+        {/* 詳細資訊 toggle */}
+        <div className="flex justify-end mt-1.5">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-1 text-[11px] text-[#4F7CFF] font-medium"
+          >
+            詳細資訊
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {/* ── Expanded details ── */}
+      {open && (
+        <div className="border-t border-white/60 px-3 py-3 space-y-2 bg-white/40">
+          <p className="text-xs text-gray-700 leading-relaxed">{item.assessment}</p>
+          {item.riskDetails && (
+            <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 leading-relaxed">
+              ⚠️ {item.riskDetails}
+            </p>
+          )}
+          <p className="text-xs text-[#4F7CFF] font-medium">💡 {item.recommendation}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IngredientRow({ item, defaultOpen = false }: { item: MatchedIngredient; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   const cfg = RISK_CONFIG[item.riskLevel]
@@ -746,7 +803,6 @@ export default function AnalysisPage() {
                                     <p className="text-[10px] text-gray-400">上次分析：{savedDate}</p>
                                   )}
                                 </div>
-                                {/* 重新分析按鈕 */}
                                 {!nutritionAiLoading && (
                                   <button
                                     onClick={() => runNutritionAi(nutrientTotals, nutritionByProduct.length)}
@@ -763,28 +819,14 @@ export default function AnalysisPage() {
                               <p className="text-sm text-gray-700 leading-relaxed">{nutritionAiResult.overall}</p>
                             </div>
 
-                            {/* Per-nutrient items */}
+                            {/* Per-nutrient items — summary + expandable details */}
                             <div className="space-y-2">
                               <p className="text-xs font-semibold text-gray-500">各營養素分析</p>
                               {nutritionAiResult.items.map((item, i) => {
                                 const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.safe
+                                const isRisk = item.status === 'warning' || item.status === 'danger'
                                 return (
-                                  <div key={i} className={`rounded-xl border ${cfg.border} ${cfg.bg} p-3`}>
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                      <span className="text-base">{cfg.icon}</span>
-                                      <p className="font-semibold text-sm text-[#1a1a2e] flex-1">{item.nutrient}</p>
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.badge}`}>{cfg.label}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{item.assessment}</p>
-                                    {item.riskDetails && (
-                                      <p className="text-xs text-gray-600 mt-1.5 bg-white/60 rounded-lg px-2 py-1.5 leading-relaxed">
-                                        ⚠️ {item.riskDetails}
-                                      </p>
-                                    )}
-                                    <p className="text-xs text-[#4F7CFF] font-medium mt-1.5">
-                                      💡 {item.recommendation}
-                                    </p>
-                                  </div>
+                                  <NutrientCard key={i} item={item} cfg={cfg} isRisk={isRisk} />
                                 )
                               })}
                             </div>
@@ -801,6 +843,12 @@ export default function AnalysisPage() {
                                 ))}
                               </div>
                             )}
+
+                            {/* Reference source */}
+                            <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-[10px] text-gray-400 leading-relaxed">
+                              <span className="font-medium text-gray-500">資料參考來源：</span>
+                              世界動物衛生組織、世界獸醫協會、WSAVA、CAPC、OFA、APOP、NRC、AAFCO、FEDIAF、PNA、AAVN、Waltham Petcare Science Institute、農業部動植物防疫檢疫署、農業部食品藥物管理署、農業部、中華民國獸醫師公會全國聯合會、台灣小動物獸醫學會、台灣獸醫內科醫學會、台灣獸醫外科醫學會、國立臺灣大學獸醫專業學院、國立中興大學獸醫學系
+                            </div>
                           </div>
                         )
                       })()}

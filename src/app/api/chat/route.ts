@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
-import { symptomTypeLabel, severityLabel, productTypeLabel, parseJson } from '@/lib/utils'
+import { symptomTypeLabel, severityLabel, productTypeLabel, parseJson, VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
 
     // Build system prompt with pet context
     const systemPrompt = `你是一個寵物健康助理。根據飼主提供的症狀記錄和使用產品，用問診方式引導補充資訊，給出觀察建議和改善計畫。重要：你提供的是資訊整理與觀察建議，不能替代獸醫診斷。若症狀嚴重（突發腫脹、出血、精神食慾明顯下降、持續嘔吐）請建議立即就醫。
+
+${VET_REFERENCE_SCOPE}
 
 ## 寵物資料
 - 名稱：${pet.name}

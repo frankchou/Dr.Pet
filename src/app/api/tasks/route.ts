@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
-import { parseJson, symptomTypeLabel } from '@/lib/utils'
+import { parseJson, symptomTypeLabel, VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
     const mainProblems = parseJson<string[]>(pet.mainProblems, [])
 
     const prompt = `幫寵物「${pet.name}」（${pet.species}）制定本週健康管理任務清單。
+${VET_REFERENCE_SCOPE}
+
 
 主要健康問題：${mainProblems.map((p: string) => symptomTypeLabel(p)).join('、') || '無特別問題'}
 近期症狀：${

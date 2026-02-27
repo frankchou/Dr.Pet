@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
+import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 interface NutrientInput {
   name: string
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
       .join('\n')
 
     const prompt = `你是一位專業的寵物臨床營養師。請根據以下資料，分析這隻寵物的飲食營養安全性。
+${VET_REFERENCE_SCOPE}
 
 ## 寵物基本資料
 - 物種：${speciesLabel}

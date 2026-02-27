@@ -53,3 +53,6 @@ export function parseJson<T>(str: string, fallback: T): T {
     return fallback
   }
 }
+
+// Authoritative veterinary reference organizations for AI prompts
+export const VET_REFERENCE_SCOPE = `知識參考範圍：世界動物衛生組織（World Organisation for Animal Health）、世界獸醫協會（World Veterinary Association）、世界小動物獸醫師協會（WSAVA）、Companion Animal Parasite Council (CAPC)、Orthopedic Foundation for Animals (OFA)、Association for Pet Obesity Prevention (APOP)、NRC（National Research Council）、AAFCO（美國飼料管理協會）、FEDIAF（歐洲寵物食品工業聯合會）、Pet Nutrition Alliance (PNA)、American Academy of Veterinary Nutrition (AAVN)、Waltham Petcare Science Institute、農業部動植物防疫檢疫署、農業部食品藥物管理署、農業部、中華民國獸醫師公會全國聯合會、台灣小動物獸醫學會、台灣獸醫內科醫學會、台灣獸醫外科醫學會、國立臺灣大學獸醫專業學院、國立中興大學獸醫學系`

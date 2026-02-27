@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { anthropic } from '@/lib/anthropic'
+import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -90,6 +91,7 @@ export async function POST(request: NextRequest) {
     const problemsLabel = mainProblems.length > 0 ? mainProblems.join('、') : '一般健康'
 
     const prompt = `你是一位寵物營養師，正在協助一位飼主。
+${VET_REFERENCE_SCOPE}
 寵物資訊：${speciesLabel}，主要健康問題：${problemsLabel}
 使用產品「${badProduct.name}」（${badProduct.type}）後反應不好。
 社群中尚無足夠同類型寵物的反饋資料。

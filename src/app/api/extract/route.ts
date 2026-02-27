@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
+import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 const ALLOWED_TYPES: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = {
   'image/jpeg': 'image/jpeg',
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     const mediaType = ALLOWED_TYPES[rawType] ?? 'image/jpeg'
 
     const systemPrompt =
-      'You are a veterinary nutrition assistant. Extract ingredients from product labels or key info from medical records. Return JSON only, no markdown.'
+      `You are a veterinary nutrition assistant. Extract ingredients from product labels or key info from medical records. Return JSON only, no markdown.\n${VET_REFERENCE_SCOPE}`
 
     let userPrompt = ''
     if (docType === 'product') {

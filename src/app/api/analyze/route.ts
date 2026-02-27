@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
-import { symptomTypeLabel, severityLabel, productTypeLabel } from '@/lib/utils'
+import { symptomTypeLabel, severityLabel, productTypeLabel, VET_REFERENCE_SCOPE } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
       .join('\n')
 
     const prompt = `以下是寵物「${pet.name}」過去30天的症狀記錄和產品使用記錄。請分析可能的相關性和觸發因素，給出觀察建議。
+${VET_REFERENCE_SCOPE}
+
 
 ## 症狀記錄
 ${symptomsText || '（無記錄）'}
