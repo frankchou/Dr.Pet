@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { productTypeLabel } from '@/lib/utils'
@@ -43,6 +43,18 @@ interface NutritionAiResult {
   productCount?: number
 }
 
+interface ProductRecAlt {
+  type: string
+  keyFeatures: string[]
+  avoid: string[]
+  reason: string
+  searchTip: string
+}
+interface ProductRec {
+  forProduct: string
+  alternatives: ProductRecAlt[]
+}
+
 // 每 100g 乾物質的建議範圍（%）
 // min: 最低需求  warn: 超過此值需注意
 const NUTRIENT_THRESHOLDS: Record<string, { dog?: { min?: number; warn?: number }; cat?: { min?: number; warn?: number }; unit?: string }> = {
@@ -73,6 +85,38 @@ const PRIORITY_CONFIG = {
   high:   { label: '強烈建議', bg: 'bg-red-50',    border: 'border-red-200',    dot: 'bg-red-500' },
   medium: { label: '建議補充', bg: 'bg-yellow-50', border: 'border-yellow-200', dot: 'bg-yellow-500' },
   low:    { label: '可考慮',   bg: 'bg-blue-50',   border: 'border-blue-200',   dot: 'bg-blue-400' },
+}
+
+// AI 營養狀態設定（模組層級，可跨 tab 共用）
+const NUTRITION_STATUS_CONFIG = {
+  safe:    { label: '安全', bg: 'bg-green-50',  border: 'border-green-200',  badge: 'bg-green-100 text-green-700',  icon: '✅' },
+  caution: { label: '留意', bg: 'bg-yellow-50', border: 'border-yellow-200', badge: 'bg-yellow-100 text-yellow-700', icon: '⚡' },
+  warning: { label: '警示', bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-700', icon: '⛔' },
+  danger:  { label: '危險', bg: 'bg-red-50',    border: 'border-red-200',    badge: 'bg-red-100 text-red-700',      icon: '🚨' },
+} as const
+
+// ── CollapsibleGroup: 可收折的分區 ─────────────────────────────────────────────
+function CollapsibleGroup({
+  label, colorCls, children, defaultOpen = true,
+}: {
+  label: React.ReactNode; colorCls: string; children: React.ReactNode; defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center justify-between py-1 mb-1.5 ${colorCls}`}
+      >
+        <span>{label}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+          className={`w-3.5 h-3.5 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && <div className="space-y-1.5">{children}</div>}
+    </div>
+  )
 }
 
 // ── NutrientCard: summary + expandable details ────────────────────────────────
@@ -260,6 +304,9 @@ export default function AnalysisPage() {
   const [nutritionAiLoading, setNutritionAiLoading] = useState(false)
   const [nutritionAiSavedLoading, setNutritionAiSavedLoading] = useState(false)
   const [nutritionAiError, setNutritionAiError] = useState('')
+  const [recResult, setRecResult] = useState<ProductRec[] | null>(null)
+  const [recLoading, setRecLoading] = useState(false)
+  const [recError, setRecError] = useState('')
 
   useEffect(() => {
     fetch('/api/pets')
@@ -332,6 +379,29 @@ export default function AnalysisPage() {
       setNutritionAiError('網路錯誤，請稍後再試')
     } finally {
       setNutritionAiLoading(false)
+    }
+  }, [currentPetId])
+
+  const runRecommend = useCallback(async (
+    riskyProducts: Array<{ name: string; brand?: string; type: string; risks: string[]; riskLevel: 'danger' | 'warning' | 'caution' }>
+  ) => {
+    if (!currentPetId || riskyProducts.length === 0) return
+    setRecLoading(true)
+    setRecError('')
+    setRecResult(null)
+    try {
+      const res = await fetch('/api/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ petId: currentPetId, riskyProducts }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setRecError(json.error || '推薦失敗'); return }
+      setRecResult(json.recommendations)
+    } catch {
+      setRecError('網路錯誤，請稍後再試')
+    } finally {
+      setRecLoading(false)
     }
   }, [currentPetId])
 
@@ -501,30 +571,47 @@ export default function AnalysisPage() {
             {activeTab === 'risk' && (
               <div className="space-y-3">
                 {result.warningItems.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-orange-600 mb-1.5 flex items-center gap-1">
-                      <span>⛔</span> 警示成分 ({result.warningItems.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {result.warningItems.map((item, i) => (
-                        <IngredientRow key={i} item={item} defaultOpen={false} />
-                      ))}
-                    </div>
-                  </div>
+                  <CollapsibleGroup
+                    colorCls="text-orange-600"
+                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>⛔</span> 警示成分 ({result.warningItems.length})</span>}
+                  >
+                    {result.warningItems.map((item, i) => (
+                      <IngredientRow key={i} item={item} defaultOpen={false} />
+                    ))}
+                  </CollapsibleGroup>
                 )}
                 {result.cautionItems.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-yellow-700 mb-1.5 flex items-center gap-1">
-                      <span>⚡</span> 需注意成分 ({result.cautionItems.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {result.cautionItems.map((item, i) => (
-                        <IngredientRow key={i} item={item} />
-                      ))}
-                    </div>
-                  </div>
+                  <CollapsibleGroup
+                    colorCls="text-yellow-700"
+                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>⚡</span> 需注意成分 ({result.cautionItems.length})</span>}
+                  >
+                    {result.cautionItems.map((item, i) => (
+                      <IngredientRow key={i} item={item} />
+                    ))}
+                  </CollapsibleGroup>
                 )}
-                {result.warningItems.length === 0 && result.cautionItems.length === 0 && (
+
+                {/* AI 營養安全風險（有分析結果時顯示） */}
+                {nutritionAiResult && (() => {
+                  const riskItems = nutritionAiResult.items.filter(
+                    (i) => i.status === 'danger' || i.status === 'warning' || i.status === 'caution'
+                  )
+                  if (riskItems.length === 0) return null
+                  return (
+                    <CollapsibleGroup
+                      colorCls="text-[#4F7CFF]"
+                      label={<span className="text-xs font-semibold flex items-center gap-1"><span>📊</span> 營養安全風險 ({riskItems.length})</span>}
+                    >
+                      {riskItems.map((item, i) => {
+                        const cfg = NUTRITION_STATUS_CONFIG[item.status]
+                        const isRisk = item.status === 'warning' || item.status === 'danger'
+                        return <NutrientCard key={i} item={item} cfg={cfg} isRisk={isRisk} />
+                      })}
+                    </CollapsibleGroup>
+                  )
+                })()}
+
+                {result.warningItems.length === 0 && result.cautionItems.length === 0 && !nutritionAiResult && (
                   <div className="text-center py-8">
                     <p className="text-3xl mb-2">✅</p>
                     <p className="text-sm font-medium text-green-700">未發現警示或需注意的成分</p>
@@ -532,17 +619,116 @@ export default function AnalysisPage() {
                   </div>
                 )}
                 {result.safeItems.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                      <span>✓</span> 安全成分 ({result.safeItems.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {result.safeItems.map((item, i) => (
-                        <IngredientRow key={i} item={item} />
-                      ))}
-                    </div>
-                  </div>
+                  <CollapsibleGroup
+                    colorCls="text-green-700"
+                    defaultOpen={false}
+                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>✓</span> 安全成分 ({result.safeItems.length})</span>}
+                  >
+                    {result.safeItems.map((item, i) => (
+                      <IngredientRow key={i} item={item} />
+                    ))}
+                  </CollapsibleGroup>
                 )}
+
+                {/* ── AI 產品推薦 ── */}
+                {(() => {
+                  // 彙整有問題的產品
+                  const riskyProductMap = new Map<string, { name: string; brand?: string; type: string; risks: string[]; riskLevel: 'danger' | 'warning' | 'caution' }>()
+                  const addRisk = (productName: string, ingredientName: string, level: 'danger' | 'warning' | 'caution') => {
+                    const existing = riskyProductMap.get(productName)
+                    const priority = { danger: 3, warning: 2, caution: 1 }
+                    if (existing) {
+                      existing.risks.push(ingredientName)
+                      if (priority[level] > priority[existing.riskLevel]) existing.riskLevel = level
+                    } else {
+                      const prod = result.analyzedProducts.find(
+                        (p) => `${p.brand ? p.brand + ' ' : ''}${p.name}` === productName || p.name === productName
+                      )
+                      riskyProductMap.set(productName, {
+                        name: prod?.name || productName,
+                        brand: prod?.brand ?? undefined,
+                        type: prod?.type || 'other',
+                        risks: [ingredientName],
+                        riskLevel: level,
+                      })
+                    }
+                  }
+                  result.warningItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'warning')))
+                  result.cautionItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'caution')))
+                  result.toxicItems.forEach((item) => item.foundIn.forEach((p) => addRisk(p, item.displayName, 'danger')))
+                  const riskyProducts = Array.from(riskyProductMap.values())
+                  if (riskyProducts.length === 0 && !recResult && !recLoading) return null
+
+                  return (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="px-4 pt-4 pb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-base">🛒</span>
+                          <p className="font-semibold text-sm text-[#1a1a2e] flex-1">AI 產品替代推薦</p>
+                        </div>
+                        <p className="text-xs text-gray-400">根據風險成分與寵物健康狀況，推薦更安全的替代品方向</p>
+                      </div>
+
+                      {!recResult && !recLoading && (
+                        <div className="px-4 pb-4">
+                          <button
+                            onClick={() => runRecommend(riskyProducts)}
+                            className="w-full py-3 bg-gradient-to-r from-[#4F7CFF] to-[#6B8FFF] text-white rounded-xl font-medium text-sm shadow-sm active:opacity-90"
+                          >
+                            取得 AI 替代品建議
+                          </button>
+                          {recError && <p className="text-xs text-red-500 mt-2 text-center">{recError}</p>}
+                        </div>
+                      )}
+
+                      {recLoading && (
+                        <div className="px-4 pb-4 text-center space-y-1.5">
+                          <div className="w-6 h-6 border-2 border-[#4F7CFF] border-t-transparent rounded-full animate-spin mx-auto" />
+                          <p className="text-xs text-gray-400">AI 正在分析替代品建議…</p>
+                        </div>
+                      )}
+
+                      {recResult && recResult.length > 0 && (
+                        <div className="divide-y divide-gray-50">
+                          {recResult.map((rec, ri) => (
+                            <div key={ri} className="px-4 py-3 space-y-2">
+                              <p className="text-xs font-semibold text-gray-600">替換：{rec.forProduct}</p>
+                              {rec.alternatives.map((alt, ai) => (
+                                <div key={ai} className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1.5">
+                                  <p className="text-xs font-semibold text-[#4F7CFF]">→ {alt.type}</p>
+                                  <p className="text-xs text-gray-600 leading-relaxed">{alt.reason}</p>
+                                  {alt.keyFeatures.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {alt.keyFeatures.map((f, fi) => (
+                                        <span key={fi} className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">✓ {f}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {alt.avoid.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {alt.avoid.map((a, ai2) => (
+                                        <span key={ai2} className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">✕ 避開 {a}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <p className="text-[10px] text-gray-400 leading-relaxed">💡 {alt.searchTip}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                          <div className="px-4 py-2">
+                            <button
+                              onClick={() => runRecommend(riskyProducts)}
+                              className="text-xs text-[#4F7CFF] font-medium"
+                            >
+                              重新取得建議
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
@@ -798,12 +984,6 @@ export default function AnalysisPage() {
                       )}
 
                       {nutritionAiResult && (() => {
-                        const STATUS_CONFIG = {
-                          safe:    { label: '安全',   bg: 'bg-green-50',  border: 'border-green-200',  badge: 'bg-green-100 text-green-700',  icon: '✅' },
-                          caution: { label: '留意',   bg: 'bg-yellow-50', border: 'border-yellow-200', badge: 'bg-yellow-100 text-yellow-700', icon: '⚡' },
-                          warning: { label: '警示',   bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-700', icon: '⛔' },
-                          danger:  { label: '危險',   bg: 'bg-red-50',    border: 'border-red-200',    badge: 'bg-red-100 text-red-700',      icon: '🚨' },
-                        }
                         const hasRisk = nutritionAiResult.items.some((i) => i.status === 'warning' || i.status === 'danger')
                         const savedDate = nutritionAiResult.savedAt
                           ? new Date(nutritionAiResult.savedAt).toLocaleString('zh-TW', {
@@ -843,7 +1023,7 @@ export default function AnalysisPage() {
                             <div className="space-y-2">
                               <p className="text-xs font-semibold text-gray-500">各營養素分析</p>
                               {nutritionAiResult.items.map((item, i) => {
-                                const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.safe
+                                const cfg = NUTRITION_STATUS_CONFIG[item.status] || NUTRITION_STATUS_CONFIG.safe
                                 const isRisk = item.status === 'warning' || item.status === 'danger'
                                 return (
                                   <NutrientCard key={i} item={item} cfg={cfg} isRisk={isRisk} />

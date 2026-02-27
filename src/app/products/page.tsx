@@ -56,6 +56,16 @@ export default function ProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editReason, setEditReason] = useState('')
 
+  // ── Lock body scroll when modal is open ─────────────────────────────────────
+  useEffect(() => {
+    if (showAdd) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showAdd])
+
   // ── Load pets ────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/pets').then(r => r.json()).then((data: Pet[]) => {
