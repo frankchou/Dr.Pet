@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { productTypeLabel } from '@/lib/utils'
 
@@ -38,11 +38,13 @@ export default function ProductsPage() {
   const [tab, setTab] = useState<'fixed' | 'trial'>('fixed')
   const [loading, setLoading] = useState(false)
 
-  // Add-to-list modal state
+  // All products this pet has ever used (from log history) — pre-loaded for modal
+  const [petUsedProducts, setPetUsedProducts] = useState<Product[]>([])
+
+  // Add modal state
   const [showAdd, setShowAdd] = useState(false)
   const [addListType, setAddListType] = useState<'fixed' | 'trial'>('fixed')
   const [searchQ, setSearchQ] = useState('')
-  const [searchResults, setSearchResults] = useState<Product[]>([])
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [trialReason, setTrialReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -51,6 +53,7 @@ export default function ProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editReason, setEditReason] = useState('')
 
+  // ── Load pets ────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/pets').then(r => r.json()).then((data: Pet[]) => {
       setPets(data)
@@ -60,6 +63,7 @@ export default function ProductsPage() {
     })
   }, [])
 
+  // ── Load pet's product list ───────────────────────────────────────────────────
   const loadItems = useCallback(async (petId: string) => {
     if (!petId) return
     setLoading(true)
@@ -69,32 +73,56 @@ export default function ProductsPage() {
     setLoading(false)
   }, [])
 
+  // ── Load all products this pet has ever used (for modal browsing) ─────────────
+  const loadPetUsedProducts = useCallback(async (petId: string) => {
+    if (!petId) return
+    const res = await fetch(`/api/usages?petId=${petId}&limit=200`)
+    const usages: { productId: string; product: Product }[] = await res.json()
+    const seen = new Set<string>()
+    const unique: Product[] = []
+    for (const u of usages) {
+      if (!seen.has(u.productId)) {
+        seen.add(u.productId)
+        unique.push(u.product)
+      }
+    }
+    setPetUsedProducts(unique)
+  }, [])
+
   useEffect(() => {
     if (currentPetId) {
       loadItems(currentPetId)
+      loadPetUsedProducts(currentPetId)
       localStorage.setItem('drpet_currentPetId', currentPetId)
     }
-  }, [currentPetId, loadItems])
+  }, [currentPetId, loadItems, loadPetUsedProducts])
 
-  // Search products
-  useEffect(() => {
-    if (!searchQ.trim()) { setSearchResults([]); return }
-    const timer = setTimeout(async () => {
-      const res = await fetch(`/api/products?search=${encodeURIComponent(searchQ)}`)
-      setSearchResults(await res.json())
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQ])
+  // ── Modal product list (filter petUsedProducts by searchQ) ────────────────────
+  const modalProducts = useMemo(() => {
+    const q = searchQ.trim().toLowerCase()
+    return petUsedProducts.filter(p => {
+      if (!q) return true
+      return p.name.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)
+    })
+  }, [petUsedProducts, searchQ])
 
+  // Map productId → listType for products already in the list
+  const inListMap = useMemo(() => {
+    const m: Record<string, 'fixed' | 'trial'> = {}
+    for (const it of items) m[it.productId] = it.listType as 'fixed' | 'trial'
+    return m
+  }, [items])
+
+  // ── Open modal ───────────────────────────────────────────────────────────────
   const openAdd = (lt: 'fixed' | 'trial') => {
     setAddListType(lt)
     setSearchQ('')
-    setSearchResults([])
     setSelectedProduct(null)
     setTrialReason('')
     setShowAdd(true)
   }
 
+  // ── Add to list ───────────────────────────────────────────────────────────────
   const handleAddToList = async () => {
     if (!selectedProduct) return
     setSaving(true)
@@ -113,6 +141,7 @@ export default function ProductsPage() {
     loadItems(currentPetId)
   }
 
+  // ── Move between lists ────────────────────────────────────────────────────────
   const handleMoveList = async (item: PetProduct, newType: 'fixed' | 'trial') => {
     await fetch(`/api/pet-products/${item.id}`, {
       method: 'PATCH',
@@ -123,11 +152,13 @@ export default function ProductsPage() {
     setTab(newType)
   }
 
+  // ── Remove ────────────────────────────────────────────────────────────────────
   const handleRemove = async (id: string) => {
     await fetch(`/api/pet-products/${id}`, { method: 'DELETE' })
     setItems(prev => prev.filter(i => i.id !== id))
   }
 
+  // ── Save trial reason ─────────────────────────────────────────────────────────
   const handleSaveReason = async (id: string) => {
     await fetch(`/api/pet-products/${id}`, {
       method: 'PATCH',
@@ -142,11 +173,11 @@ export default function ProductsPage() {
   const displayed = items.filter(i => i.listType === tab)
 
   return (
-    <div className="min-h-screen bg-[#F8F9FF]">
-      {/* Header */}
-      <div className="bg-white px-4 pt-12 pb-4 shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-[#F8F9FF] pb-36">
+      {/* ── Sticky header ── */}
+      <div className="bg-white px-4 pt-12 pb-3 shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600">
+          <button onClick={() => router.back()} className="text-gray-400">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path d="M19 12H5M12 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -158,58 +189,50 @@ export default function ProductsPage() {
         {pets.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {pets.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setCurrentPetId(p.id)}
+              <button key={p.id} onClick={() => setCurrentPetId(p.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  currentPetId === p.id
-                    ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]'
-                    : 'bg-white text-gray-600 border-gray-200'
-                }`}
-              >
+                  currentPetId === p.id ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]' : 'bg-white text-gray-600 border-gray-200'
+                }`}>
                 <span>{SPECIES_EMOJI[p.species] || '🐾'}</span>
                 {p.name}
               </button>
             ))}
           </div>
         )}
-      </div>
 
-      <div className="px-4 py-4">
         {/* Tabs */}
-        <div className="flex bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-4">
+        <div className="flex bg-gray-100 rounded-xl p-1 mt-3">
           {(['fixed', 'trial'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
+            <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                tab === t ? 'bg-[#4F7CFF] text-white' : 'text-gray-500'
-              }`}
-            >
+                tab === t ? 'bg-white text-[#4F7CFF] shadow-sm' : 'text-gray-500'
+              }`}>
               {t === 'fixed' ? '🏠 固定清單' : '🧪 試用清單'}
               <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                tab === t ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                tab === t ? 'bg-[#4F7CFF]/10 text-[#4F7CFF]' : 'bg-gray-200 text-gray-500'
               }`}>
                 {items.filter(i => i.listType === t).length}
               </span>
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Tab description */}
+      {/* ── List ── */}
+      <div className="px-4 py-3">
         <p className="text-xs text-gray-400 mb-3 px-1">
           {tab === 'fixed'
-            ? `${currentPet?.name || '寵物'} 每天固定食用的產品清單`
-            : `${currentPet?.name || '寵物'} 正在嘗試的新產品，可記錄試用原因`}
+            ? `${currentPet?.name || '寵物'} 每天固定食用的產品`
+            : `${currentPet?.name || '寵物'} 正在嘗試的新產品`}
         </p>
 
-        {/* List */}
         {loading ? (
-          <div className="text-center py-10 text-gray-400 text-sm">載入中…</div>
+          <div className="text-center py-16 text-gray-400 text-sm">載入中…</div>
         ) : displayed.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
-            <div className="text-3xl mb-2">{tab === 'fixed' ? '🛒' : '🔬'}</div>
+          <div className="text-center py-16 text-gray-400">
+            <div className="text-4xl mb-3">{tab === 'fixed' ? '🛒' : '🔬'}</div>
             <p className="text-sm">{tab === 'fixed' ? '尚未新增固定產品' : '目前沒有試用中的產品'}</p>
+            <p className="text-xs text-gray-300 mt-1">點擊下方按鈕新增</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -221,31 +244,26 @@ export default function ProductsPage() {
                       <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
                         {productTypeLabel(item.product.type)}
                       </span>
-                      <span className="text-sm font-semibold text-gray-800 truncate">{item.product.name}</span>
+                      <span className="text-sm font-semibold text-gray-800">{item.product.name}</span>
                     </div>
                     {item.product.brand && (
                       <p className="text-xs text-gray-400 mt-0.5">{item.product.brand}</p>
                     )}
                     {tab === 'trial' && (
-                      <div className="mt-1.5">
+                      <div className="mt-2">
                         {editingId === item.id ? (
                           <div className="flex items-center gap-1.5">
-                            <input
-                              value={editReason}
-                              onChange={e => setEditReason(e.target.value)}
+                            <input value={editReason} onChange={e => setEditReason(e.target.value)}
                               placeholder="試用原因…"
-                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#4F7CFF]/40"
-                            />
-                            <button onClick={() => handleSaveReason(item.id)} className="text-xs text-[#4F7CFF] font-medium">儲存</button>
+                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#4F7CFF]/40" />
+                            <button onClick={() => handleSaveReason(item.id)} className="text-xs text-[#4F7CFF] font-medium px-2 py-1 bg-blue-50 rounded-lg">儲存</button>
                             <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">取消</button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => { setEditingId(item.id); setEditReason(item.trialReason || '') }}
-                            className="text-xs text-gray-500 flex items-center gap-1"
-                          >
-                            <span className="text-[10px] text-[#FF8C42]">試用原因：</span>
-                            <span className={item.trialReason ? 'text-gray-600' : 'text-gray-300'}>
+                          <button onClick={() => { setEditingId(item.id); setEditReason(item.trialReason || '') }}
+                            className="flex items-start gap-1 text-left w-full">
+                            <span className="text-[10px] text-[#FF8C42] font-medium shrink-0 mt-0.5">試用原因</span>
+                            <span className={`text-xs ${item.trialReason ? 'text-gray-600' : 'text-gray-300'}`}>
                               {item.trialReason || '點擊新增原因 ✏️'}
                             </span>
                           </button>
@@ -254,27 +272,20 @@ export default function ProductsPage() {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-col gap-1 shrink-0">
+                  <div className="flex flex-col gap-1.5 shrink-0">
                     {tab === 'fixed' ? (
-                      <button
-                        onClick={() => handleMoveList(item, 'trial')}
-                        className="text-[10px] text-[#4F7CFF] bg-blue-50 px-2 py-1 rounded-lg whitespace-nowrap"
-                      >
-                        移至試用
+                      <button onClick={() => handleMoveList(item, 'trial')}
+                        className="text-[10px] text-[#4F7CFF] bg-blue-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                        → 試用清單
                       </button>
                     ) : (
-                      <button
-                        onClick={() => handleMoveList(item, 'fixed')}
-                        className="text-[10px] text-green-700 bg-green-50 px-2 py-1 rounded-lg whitespace-nowrap"
-                      >
-                        移至固定
+                      <button onClick={() => handleMoveList(item, 'fixed')}
+                        className="text-[10px] text-green-700 bg-green-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                        → 固定清單
                       </button>
                     )}
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      className="text-[10px] text-red-400 bg-red-50 px-2 py-1 rounded-lg"
-                    >
+                    <button onClick={() => handleRemove(item.id)}
+                      className="text-[10px] text-red-400 bg-red-50 px-2 py-1 rounded-lg">
                       移除
                     </button>
                   </div>
@@ -283,12 +294,12 @@ export default function ProductsPage() {
             ))}
           </div>
         )}
+      </div>
 
-        {/* Add button */}
-        <button
-          onClick={() => openAdd(tab)}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-[#4F7CFF]/30 text-[#4F7CFF] rounded-2xl text-sm font-medium hover:bg-[#4F7CFF]/5 transition-colors"
-        >
+      {/* ── Sticky add button (above bottom nav) ── */}
+      <div className="fixed bottom-[64px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[calc(480px-2rem)] z-20">
+        <button onClick={() => openAdd(tab)}
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#4F7CFF] text-white rounded-2xl font-medium text-sm shadow-lg active:opacity-90 transition-opacity">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />
           </svg>
@@ -296,81 +307,126 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      {/* Add product modal */}
+      {/* ── Add product modal ── */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowAdd(false)}>
-          <div className="w-full max-w-[480px] bg-white rounded-t-3xl px-4 pt-5 pb-8 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-gray-800">
-                新增至{addListType === 'fixed' ? '固定' : '試用'}清單
-              </h2>
-              <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl leading-none">✕</button>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          onClick={() => setShowAdd(false)}>
+          <div className="w-full max-w-[480px] bg-white rounded-t-3xl flex flex-col"
+            style={{ maxHeight: '80vh' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Modal header — fixed */}
+            <div className="px-4 pt-5 pb-3 border-b border-gray-100 shrink-0">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-semibold text-gray-800">
+                  {addListType === 'fixed' ? '🏠 新增固定產品' : '🧪 新增試用產品'}
+                </h2>
+                <button onClick={() => setShowAdd(false)} className="text-gray-400 text-xl leading-none w-7 h-7 flex items-center justify-center">✕</button>
+              </div>
+
+              {/* Search bar — always visible */}
+              <input
+                type="text"
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+                placeholder="搜尋已記錄的產品名稱或品牌…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                autoFocus
+              />
+              {petUsedProducts.length === 0 && (
+                <p className="text-[11px] text-gray-400 mt-1.5 px-1">尚無使用記錄，請先在日誌中新增產品</p>
+              )}
             </div>
 
-            {/* Search */}
+            {/* ── Step: select product ── */}
             {!selectedProduct ? (
-              <>
-                <input
-                  type="text"
-                  value={searchQ}
-                  onChange={e => setSearchQ(e.target.value)}
-                  placeholder="搜尋產品名稱或品牌…"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40 mb-3"
-                  autoFocus
-                />
-                {searchResults.length > 0 && (
-                  <div className="space-y-1.5">
-                    {searchResults.map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => { setSelectedProduct(p); setSearchQ('') }}
-                        className="w-full text-left px-3 py-2.5 bg-gray-50 hover:bg-blue-50 rounded-xl text-sm flex items-center gap-2 transition-colors"
-                      >
-                        <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                          {productTypeLabel(p.type)}
-                        </span>
-                        <span className="font-medium text-gray-800">{p.name}</span>
-                        {p.brand && <span className="text-gray-400 text-xs">{p.brand}</span>}
-                      </button>
-                    ))}
+              <div className="flex-1 overflow-y-auto px-4 py-2">
+                {modalProducts.length === 0 && searchQ.trim() ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">找不到相符產品</div>
+                ) : (
+                  <div className="space-y-1.5 py-1">
+                    {modalProducts.map(p => {
+                      const status = inListMap[p.id]
+                      const alreadyHere = status === addListType
+                      const inOther = status && status !== addListType
+                      return (
+                        <button key={p.id}
+                          disabled={alreadyHere}
+                          onClick={() => { if (!alreadyHere) setSelectedProduct(p) }}
+                          className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-3 transition-colors ${
+                            alreadyHere
+                              ? 'bg-gray-50 opacity-50 cursor-not-allowed'
+                              : 'bg-gray-50 hover:bg-blue-50 active:bg-blue-100'
+                          }`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-100 shrink-0">
+                                {productTypeLabel(p.type)}
+                              </span>
+                              <span className="text-sm font-medium text-gray-800 truncate">{p.name}</span>
+                            </div>
+                            {p.brand && <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>}
+                          </div>
+                          {alreadyHere && (
+                            <span className="text-[10px] bg-[#4F7CFF]/10 text-[#4F7CFF] px-1.5 py-0.5 rounded shrink-0">已在清單</span>
+                          )}
+                          {inOther && (
+                            <span className="text-[10px] bg-orange-50 text-[#FF8C42] px-1.5 py-0.5 rounded shrink-0">
+                              在{status === 'fixed' ? '固定' : '試用'}清單
+                            </span>
+                          )}
+                          {!status && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                              className="w-4 h-4 text-gray-300 shrink-0">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
-                {searchQ && searchResults.length === 0 && (
-                  <p className="text-center text-sm text-gray-400 py-3">找不到產品，請先在日誌中新增</p>
-                )}
-              </>
+              </div>
             ) : (
-              <>
-                {/* Selected product confirmation */}
-                <div className="bg-blue-50 rounded-xl px-3 py-2.5 flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{selectedProduct.name}</p>
-                    {selectedProduct.brand && <p className="text-xs text-gray-500">{selectedProduct.brand}</p>}
+              /* ── Step: confirm + (trial reason) ── */
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                {/* Selected product card */}
+                <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-3 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-100">
+                        {productTypeLabel(selectedProduct.type)}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{selectedProduct.name}</span>
+                    </div>
+                    {selectedProduct.brand && <p className="text-xs text-gray-500 mt-0.5">{selectedProduct.brand}</p>}
                   </div>
-                  <button onClick={() => setSelectedProduct(null)} className="text-xs text-gray-400">更換</button>
+                  <button onClick={() => setSelectedProduct(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600 shrink-0 ml-2 underline">
+                    更換
+                  </button>
                 </div>
 
+                {/* Trial reason input */}
                 {addListType === 'trial' && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">試用原因（選填）</label>
-                    <input
-                      type="text"
-                      value={trialReason}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      試用原因 <span className="text-gray-400 font-normal text-xs">（選填）</span>
+                    </label>
+                    <input type="text" value={trialReason}
                       onChange={e => setTrialReason(e.target.value)}
-                      placeholder="例：想改善皮膚問題、獸醫建議嘗試…"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                      placeholder="例：想改善皮膚問題、獸醫建議嘗試此配方…"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                      autoFocus
                     />
                   </div>
                 )}
 
-                <button
-                  onClick={handleAddToList}
-                  disabled={saving}
-                  className="w-full bg-[#4F7CFF] text-white rounded-xl py-3 font-medium text-sm disabled:opacity-60"
-                >
+                <button onClick={handleAddToList} disabled={saving}
+                  className="w-full bg-[#4F7CFF] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 active:opacity-90 transition-opacity">
                   {saving ? '新增中…' : `加入${addListType === 'fixed' ? '固定' : '試用'}清單`}
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
