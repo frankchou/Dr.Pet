@@ -109,7 +109,7 @@ export default function ChatPage() {
   const showEmpty = !historyLoading && messages.length === 0
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen -mb-20">
       <PageHeader
         title="AI 健康對話"
         rightElement={

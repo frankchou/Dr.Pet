@@ -38,11 +38,8 @@ export default function ProductsPage() {
   const [tab, setTab] = useState<'fixed' | 'trial'>('fixed')
   const [loading, setLoading] = useState(false)
 
-  // Products this pet has used (from log history) — shown first in modal
+  // Products this pet has used (from log history) — shown in modal
   const [petUsedProducts, setPetUsedProducts] = useState<Product[]>([])
-  // All products in DB — loaded lazily when modal first opens
-  const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [allProductsLoaded, setAllProductsLoaded] = useState(false)
 
   // Add modal state
   const [showAdd, setShowAdd] = useState(false)
@@ -110,39 +107,46 @@ export default function ProductsPage() {
     }
   }, [currentPetId, loadItems, loadPetUsedProducts])
 
-  // ── Modal product list: petUsedProducts first, then all others ───────────────
-  const usedProductIds = useMemo(() => new Set(petUsedProducts.map(p => p.id)), [petUsedProducts])
-
+  // ── Modal product list: only products this pet has used ─────────────────────
   const modalProducts = useMemo(() => {
     const q = searchQ.trim().toLowerCase()
-    const others = allProducts.filter(p => !usedProductIds.has(p.id))
-    const combined = [...petUsedProducts, ...others]
-    if (!q) return combined
-    return combined.filter(p =>
+    if (!q) return petUsedProducts
+    return petUsedProducts.filter(p =>
       p.name.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)
     )
-  }, [petUsedProducts, allProducts, usedProductIds, searchQ])
+  }, [petUsedProducts, searchQ])
 
-  // Map productId → listType for products already in the list
+  // Map productId → listType AND productName → listType for cross-section status lookup
   const inListMap = useMemo(() => {
     const m: Record<string, 'fixed' | 'trial'> = {}
-    for (const it of items) m[it.productId] = it.listType as 'fixed' | 'trial'
+    for (const it of items) {
+      m[it.productId] = it.listType as 'fixed' | 'trial'
+      m[`n:${it.product.name.toLowerCase().trim()}`] = it.listType as 'fixed' | 'trial'
+    }
     return m
   }, [items])
 
-  // ── Open modal (lazy-load all products on first open) ────────────────────────
+  // Resolve status for any product — by ID first, then fuzzy name containment
+  const getProductStatus = useCallback((p: Product): 'fixed' | 'trial' | undefined => {
+    if (inListMap[p.id]) return inListMap[p.id]
+    const pName = p.name.toLowerCase().trim()
+    if (inListMap[`n:${pName}`]) return inListMap[`n:${pName}`]
+    // Containment check: "自然本色鮭魚" ↔ "自然本色鮭魚飼料"
+    for (const [key, listType] of Object.entries(inListMap)) {
+      if (!key.startsWith('n:')) continue
+      const listedName = key.slice(2)
+      if (pName.includes(listedName) || listedName.includes(pName)) return listType
+    }
+    return undefined
+  }, [inListMap])
+
+  // ── Open modal ────────────────────────────────────────────────────────────────
   const openAdd = (lt: 'fixed' | 'trial') => {
     setAddListType(lt)
     setSearchQ('')
     setSelectedProduct(null)
     setTrialReason('')
     setShowAdd(true)
-    if (!allProductsLoaded) {
-      fetch('/api/products')
-        .then(r => r.json())
-        .then((data: Product[]) => { setAllProducts(data); setAllProductsLoaded(true) })
-        .catch(() => {})
-    }
   }
 
   // ── Add to list ───────────────────────────────────────────────────────────────
@@ -361,62 +365,52 @@ export default function ProductsPage() {
             {/* ── Step: select product ── */}
             {!selectedProduct ? (
               <div className="flex-1 overflow-y-auto px-4 py-2">
-                {modalProducts.length === 0 && searchQ.trim() ? (
+                {petUsedProducts.length === 0 && !searchQ.trim() ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">尚無使用紀錄</div>
+                ) : modalProducts.length === 0 && searchQ.trim() ? (
                   <div className="text-center py-8 text-gray-400 text-sm">找不到相符產品</div>
                 ) : (
                   <div className="py-1">
-                    {modalProducts.map((p, idx) => {
-                      const isUsed = usedProductIds.has(p.id)
-                      const prevIsUsed = idx > 0 && usedProductIds.has(modalProducts[idx - 1].id)
-                      const q = searchQ.trim()
-                      // Section headers (only when not searching)
-                      const showUsedHeader = !q && isUsed && idx === 0 && petUsedProducts.length > 0
-                      const showAllHeader = !q && !isUsed && (idx === 0 || prevIsUsed)
-
-                      const status = inListMap[p.id]
-                      const alreadyHere = status === addListType
-                      const inOther = status && status !== addListType
+                    {modalProducts.map((p) => {
+                      const status = getProductStatus(p)
+                      const alreadyHere = status === addListType || (addListType === 'trial' && status === 'fixed')
+                      const inOther = status && !alreadyHere
                       return (
-                        <div key={p.id}>
-                          {showUsedHeader && (
-                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-1 pt-1 pb-1.5">曾使用</p>
-                          )}
-                          {showAllHeader && (
-                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-1 pt-3 pb-1.5">所有產品</p>
-                          )}
-                          <button
-                            disabled={alreadyHere}
-                            onClick={() => { if (!alreadyHere) setSelectedProduct(p) }}
-                            className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-3 transition-colors mb-1.5 ${
-                              alreadyHere
-                                ? 'bg-gray-50 opacity-50 cursor-not-allowed'
-                                : 'bg-gray-50 hover:bg-blue-50 active:bg-blue-100'
-                            }`}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-100 shrink-0">
-                                  {productTypeLabel(p.type)}
-                                </span>
-                                <span className="text-sm font-medium text-gray-800 truncate">{p.name}</span>
-                              </div>
-                              {p.brand && <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>}
-                            </div>
-                            {alreadyHere && (
-                              <span className="text-[10px] bg-[#4F7CFF]/10 text-[#4F7CFF] px-1.5 py-0.5 rounded shrink-0">已在清單</span>
-                            )}
-                            {inOther && (
-                              <span className="text-[10px] bg-orange-50 text-[#FF8C42] px-1.5 py-0.5 rounded shrink-0">
-                                在{status === 'fixed' ? '固定' : '試用'}清單
+                        <button
+                          key={p.id}
+                          disabled={alreadyHere}
+                          onClick={() => { if (!alreadyHere) setSelectedProduct(p) }}
+                          className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-3 transition-colors mb-1.5 ${
+                            alreadyHere
+                              ? 'bg-gray-50 opacity-50 cursor-not-allowed'
+                              : 'bg-gray-50 hover:bg-blue-50 active:bg-blue-100'
+                          }`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-100 shrink-0">
+                                {productTypeLabel(p.type)}
                               </span>
-                            )}
-                            {!status && (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-                                className="w-4 h-4 text-gray-300 shrink-0">
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
+                              <span className="text-sm font-medium text-gray-800 truncate">{p.name}</span>
+                            </div>
+                            {p.brand && <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>}
+                          </div>
+                          {alreadyHere && (
+                            <span className="text-[10px] bg-[#4F7CFF]/10 text-[#4F7CFF] px-1.5 py-0.5 rounded shrink-0">
+                              {addListType === 'trial' && status === 'fixed' ? '已在固定清單' : '已在清單'}
+                            </span>
+                          )}
+                          {inOther && (
+                            <span className="text-[10px] bg-orange-50 text-[#FF8C42] px-1.5 py-0.5 rounded shrink-0">
+                              在{status === 'fixed' ? '固定' : '試用'}清單
+                            </span>
+                          )}
+                          {!status && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                              className="w-4 h-4 text-gray-300 shrink-0">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
