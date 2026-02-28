@@ -12,16 +12,35 @@ interface RiskyProduct {
 }
 
 interface AlternativeRec {
-  type: string           // 產品類型（乾糧/濕食/零食/補充品…）
-  keyFeatures: string[]  // 選購時要注意的特性
-  avoid: string[]        // 要避開的成分或特徵
-  reason: string         // 為何這樣推薦
+  productName: string    // 具體推薦的產品名稱（品牌 + 系列名）
+  reason: string         // 為何這款產品更適合
+  keyFeatures: string[]  // 此產品的優點特性
+  avoid: string[]        // 購買時要確認避開的成分或特徵
   searchTip: string      // 搜尋/選購提示
 }
 
 export interface ProductRecommendation {
   forProduct: string     // 哪個產品
   alternatives: AlternativeRec[]
+}
+
+// GET: load latest saved recommendation for a pet
+export async function GET(request: NextRequest) {
+  try {
+    const petId = request.nextUrl.searchParams.get('petId')
+    if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const saved = await prisma.productRecommendationResult.findFirst({
+      where: { petId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!saved) return NextResponse.json(null)
+    return NextResponse.json({ recommendations: JSON.parse(saved.resultJson), savedAt: saved.createdAt })
+  } catch (error) {
+    console.error('GET /api/recommend error:', error)
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -57,7 +76,10 @@ ${VET_REFERENCE_SCOPE}
 ${productLines}
 
 ## 任務
-請針對每個有問題的產品，推薦 1-2 個更安全的替代品方向（非特定品牌，而是類型、成分特性與選購方向）。
+請針對每個有問題的產品，推薦 1-2 款具體的替代產品。要求：
+1. 必須給出具體的品牌與產品系列名稱（例如：「自然本色 白魚無穀配方」、「Orijen 無穀六種魚」）
+2. 優先推薦台灣市場較容易購得、口碑良好的產品
+3. 說明為何這款產品可以解決目前的問題
 
 只回傳 JSON，格式如下：
 {
@@ -66,11 +88,11 @@ ${productLines}
       "forProduct": "產品名稱",
       "alternatives": [
         {
-          "type": "產品類型（如：低磷貓咪濕食、天然無添加乾糧）",
-          "keyFeatures": ["選購時要注意的特性1", "特性2"],
-          "avoid": ["要避開的成分或特徵1", "特徵2"],
-          "reason": "為什麼這樣的替代品更適合（1句）",
-          "searchTip": "在寵物店或網路上如何找到這類產品的具體建議（1句）"
+          "productName": "品牌 產品系列名稱（例如：自然本色 白魚無穀狗糧）",
+          "reason": "為什麼這款產品更適合取代目前產品（1-2句，說明如何解決問題點）",
+          "keyFeatures": ["此產品的優點特性1", "優點特性2"],
+          "avoid": ["購買時仍需確認避開的成分或特徵1", "特徵2"],
+          "searchTip": "在哪裡可以買到、搜尋關鍵字等具體建議（1句）"
         }
       ]
     }
@@ -90,7 +112,24 @@ ${productLines}
     if (!match) throw new Error('AI 回應格式錯誤')
 
     const { recommendations } = JSON.parse(match[0])
-    return NextResponse.json({ recommendations })
+
+    // Save to DB (keep only the latest 1 record per pet)
+    const old = await prisma.productRecommendationResult.findMany({
+      where: { petId },
+      orderBy: { createdAt: 'desc' },
+      skip: 0,
+      select: { id: true },
+    })
+    if (old.length > 0) {
+      await prisma.productRecommendationResult.deleteMany({
+        where: { id: { in: old.map((r) => r.id) } },
+      })
+    }
+    const saved = await prisma.productRecommendationResult.create({
+      data: { petId, resultJson: JSON.stringify(recommendations) },
+    })
+
+    return NextResponse.json({ recommendations, savedAt: saved.createdAt })
   } catch (error) {
     console.error('POST /api/recommend error:', error)
     const msg = error instanceof Error ? error.message : 'Unknown error'

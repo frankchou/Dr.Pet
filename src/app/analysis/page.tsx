@@ -44,10 +44,10 @@ interface NutritionAiResult {
 }
 
 interface ProductRecAlt {
-  type: string
+  productName: string
+  reason: string
   keyFeatures: string[]
   avoid: string[]
-  reason: string
   searchTip: string
 }
 interface ProductRec {
@@ -307,6 +307,8 @@ export default function AnalysisPage() {
   const [recResult, setRecResult] = useState<ProductRec[] | null>(null)
   const [recLoading, setRecLoading] = useState(false)
   const [recError, setRecError] = useState('')
+  const [recSavedAt, setRecSavedAt] = useState<string | null>(null)
+  const [recSavedLoading, setRecSavedLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/pets')
@@ -347,6 +349,21 @@ export default function AnalysisPage() {
       .then((json) => { if (json) setNutritionAiResult(json) })
       .catch(() => { /* 無已儲存結果，忽略 */ })
       .finally(() => setNutritionAiSavedLoading(false))
+    // 同時載入該寵物最新的 AI 產品推薦
+    setRecResult(null)
+    setRecSavedAt(null)
+    setRecError('')
+    setRecSavedLoading(true)
+    fetch(`/api/recommend?petId=${currentPetId}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.recommendations) {
+          setRecResult(json.recommendations)
+          setRecSavedAt(json.savedAt ?? null)
+        }
+      })
+      .catch(() => { /* 無已儲存結果，忽略 */ })
+      .finally(() => setRecSavedLoading(false))
   }, [currentPetId, runAnalysis])
 
   const handleEditRequest = useCallback(async (productId: string) => {
@@ -398,6 +415,7 @@ export default function AnalysisPage() {
       const json = await res.json()
       if (!res.ok) { setRecError(json.error || '推薦失敗'); return }
       setRecResult(json.recommendations)
+      setRecSavedAt(json.savedAt ?? null)
     } catch {
       setRecError('網路錯誤，請稍後再試')
     } finally {
@@ -682,17 +700,23 @@ export default function AnalysisPage() {
                 )}
 
                 {/* ── AI 產品推薦 ── */}
-                {(riskyProductsForRec.length > 0 || recResult || recLoading) && (
+                {(riskyProductsForRec.length > 0 || recResult || recLoading || recSavedLoading) && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                       <div className="px-4 pt-4 pb-3">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-base">🛒</span>
                           <p className="font-semibold text-sm text-[#1a1a2e] flex-1">AI 產品替代推薦</p>
                         </div>
-                        <p className="text-xs text-gray-400">根據風險成分與寵物健康狀況，推薦更安全的替代品方向</p>
+                        <p className="text-xs text-gray-400">根據風險成分與寵物健康狀況，推薦具體的替代產品</p>
                       </div>
 
-                      {!recResult && !recLoading && (
+                      {recSavedLoading && (
+                        <div className="px-4 pb-4 text-center">
+                          <div className="w-5 h-5 border-2 border-gray-200 border-t-[#4F7CFF] rounded-full animate-spin mx-auto" />
+                        </div>
+                      )}
+
+                      {!recSavedLoading && !recResult && !recLoading && (
                         <div className="px-4 pb-4">
                           <button
                             onClick={() => runRecommend(riskyProductsForRec)}
@@ -739,11 +763,11 @@ export default function AnalysisPage() {
 
                                 {/* ── 建議替代方向 ── */}
                                 <div>
-                                  <p className="text-[10px] font-semibold text-gray-400 mb-1.5 px-0.5">建議替代方向</p>
+                                  <p className="text-[10px] font-semibold text-gray-400 mb-1.5 px-0.5">推薦替代產品</p>
                                   <div className="space-y-2">
                                     {rec.alternatives.map((alt, ai) => (
                                       <div key={ai} className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1.5">
-                                        <p className="text-xs font-semibold text-[#4F7CFF]">{alt.type}</p>
+                                        <p className="text-sm font-bold text-[#4F7CFF]">{alt.productName}</p>
                                         <p className="text-xs text-gray-600 leading-relaxed">{alt.reason}</p>
                                         {alt.keyFeatures.length > 0 && (
                                           <div className="flex flex-wrap gap-1">
@@ -767,12 +791,18 @@ export default function AnalysisPage() {
                               </div>
                             )
                           })}
-                          <div className="px-4 py-2">
+                          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-50">
+                            {recSavedAt && (
+                              <p className="text-[10px] text-gray-300">
+                                {new Date(recSavedAt).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
                             <button
                               onClick={() => runRecommend(riskyProductsForRec)}
-                              className="text-xs text-[#4F7CFF] font-medium"
+                              disabled={recLoading}
+                              className="text-xs text-[#4F7CFF] font-medium ml-auto disabled:opacity-40"
                             >
-                              重新取得建議
+                              {recLoading ? '更新中…' : '重新取得建議'}
                             </button>
                           </div>
                         </div>

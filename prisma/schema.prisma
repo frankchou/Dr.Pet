@@ -40,6 +40,7 @@ model Pet {
   chatMessages   ChatMessage[]
   weeklyTasks          WeeklyTask[]
   nutritionAnalyses    NutritionAnalysis[]
+  productRecommendationResults ProductRecommendationResult[]
   petProducts          PetProduct[]
   productReactions     ProductReaction[]
   communityRecs        CommunityRec[]
@@ -186,4 +187,12 @@ model NutritionAnalysis {
   resultJson   String
   productCount Int
   createdAt    DateTime @default(now())
+}
+
+model ProductRecommendationResult {
+  id         String   @id @default(cuid())
+  petId      String
+  pet        Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  resultJson String   // JSON array of ProductRec[]
+  createdAt  DateTime @default(now())
 }
