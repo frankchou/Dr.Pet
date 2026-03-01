@@ -110,6 +110,7 @@ ${productsText}
 請只回傳 JSON，格式如下：
 {
   "verdict": "safe",
+  "suitabilityScore": 85,
   "productName": "從標籤辨識到的產品名稱（若看不出則留空字串）",
   "brandName": "從標籤辨識到的品牌名稱（若看不出則留空字串）",
   "summary": "一句話總結這款產品對此寵物的適合程度",
@@ -126,6 +127,12 @@ verdict 值必須是以下其中一個：
 - "safe"：適合，無明顯風險
 - "caution"：需謹慎，有些需留意的成分
 - "danger"：不建議，有明顯有害成分或強烈過敏風險
+
+suitabilityScore 為 0–100 的整數，代表這款產品對此寵物的整體適合程度百分比：
+- 80–100：非常適合
+- 60–79：大致適合，有少量顧慮
+- 40–59：需謹慎評估
+- 0–39：不建議使用
 
 ${VET_REFERENCE_SCOPE}`
 
@@ -150,6 +157,7 @@ ${VET_REFERENCE_SCOPE}`
 
     const result = JSON.parse(match[0]) as {
       verdict: string
+      suitabilityScore?: number
       productName?: string
       brandName?: string
       summary: string

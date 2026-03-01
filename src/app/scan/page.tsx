@@ -20,6 +20,7 @@ interface AnalysisRecord {
 
 interface AnalysisResult {
   verdict: string
+  suitabilityScore?: number
   productName?: string
   brandName?: string
   summary: string
@@ -271,16 +272,18 @@ export default function ScanPage() {
               const cfg = verdictCfg(rec.verdict)
               const date = new Date(rec.createdAt)
               const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+              const parsedScore: number | undefined = (() => { try { return JSON.parse(rec.resultJson)?.suitabilityScore } catch { return undefined } })()
               return (
                 <button key={rec.id} onClick={() => setDetailRecord(rec)}
                   className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex gap-3 active:opacity-80">
                   {/* Image thumbnail */}
-                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center">
-                    {rec.imagePath ? (
+                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center relative">
+                    <span className="text-2xl absolute pointer-events-none select-none">📷</span>
+                    {rec.imagePath && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={rec.imagePath} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-2xl">📷</span>
+                      <img src={rec.imagePath} alt="" className="w-full h-full object-cover relative"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                     )}
                   </div>
                   {/* Content */}
@@ -288,6 +291,7 @@ export default function ScanPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${cfg.badge}`}>
                         {cfg.icon} {cfg.label}
+                        {parsedScore !== undefined && <span className="ml-1">{parsedScore}%</span>}
                       </span>
                       <span className="text-[10px] text-gray-400">{dateStr}</span>
                     </div>
@@ -388,6 +392,9 @@ export default function ScanPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`text-sm font-bold ${cfg.text}`}>{cfg.label}</span>
+                          {result.suitabilityScore !== undefined && (
+                            <span className={`text-xl font-extrabold ${cfg.text}`}>{result.suitabilityScore}%</span>
+                          )}
                           {result.productName && (
                             <span className="text-xs text-gray-500 font-medium truncate">{result.productName}</span>
                           )}
@@ -587,9 +594,11 @@ export default function ScanPage() {
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                 {/* Image */}
                 {rec.imagePath && (
-                  <div className="rounded-xl overflow-hidden bg-gray-100 h-48">
+                  <div className="rounded-xl overflow-hidden bg-gray-100 h-48 flex items-center justify-center relative">
+                    <span className="text-4xl absolute pointer-events-none select-none">📷</span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={rec.imagePath} alt="" className="w-full h-full object-contain" />
+                    <img src={rec.imagePath} alt="" className="w-full h-full object-contain relative"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                   </div>
                 )}
 
@@ -598,6 +607,9 @@ export default function ScanPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">{cfg.icon}</span>
                     <span className={`text-sm font-bold ${cfg.text}`}>{cfg.label}</span>
+                    {parsed.suitabilityScore !== undefined && (
+                      <span className={`text-2xl font-extrabold ${cfg.text}`}>{parsed.suitabilityScore}%</span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-700 leading-relaxed">{rec.summary}</p>
                 </div>
