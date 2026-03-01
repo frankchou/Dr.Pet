@@ -3,15 +3,20 @@ import { prisma } from '@/lib/prisma'
 
 // GET /api/pet-products?petId=X  — list active products for a pet
 export async function GET(request: NextRequest) {
-  const petId = request.nextUrl.searchParams.get('petId')
-  if (!petId) return NextResponse.json({ error: 'petId required' }, { status: 400 })
+  try {
+    const petId = request.nextUrl.searchParams.get('petId')
+    if (!petId) return NextResponse.json({ error: 'petId required' }, { status: 400 })
 
-  const items = await prisma.petProduct.findMany({
-    where: { petId, isActive: true },
-    include: { product: true },
-    orderBy: [{ listType: 'asc' }, { createdAt: 'asc' }],
-  })
-  return NextResponse.json(items)
+    const items = await prisma.petProduct.findMany({
+      where: { petId, isActive: true },
+      include: { product: true },
+      orderBy: [{ listType: 'asc' }, { createdAt: 'asc' }],
+    })
+    return NextResponse.json(items)
+  } catch (error) {
+    console.error('GET /api/pet-products error:', error)
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
+  }
 }
 
 // POST /api/pet-products  — add a product to a pet's list

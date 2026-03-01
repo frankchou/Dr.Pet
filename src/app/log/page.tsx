@@ -351,21 +351,27 @@ export default function LogPage() {
   }, [])
 
   const loadPetProducts = useCallback(async (petId: string) => {
-    const res = await fetch(`/api/pet-products?petId=${petId}`)
-    const data = await res.json()
-    setPetProducts(Array.isArray(data) ? data : [])
+    try {
+      const res = await fetch(`/api/pet-products?petId=${petId}`)
+      const data = await res.json()
+      setPetProducts(Array.isArray(data) ? data : [])
+    } catch { setPetProducts([]) }
   }, [])
 
   const loadDayReactions = useCallback(async (petId: string, date: string) => {
-    const res = await fetch(`/api/reactions?petId=${petId}&date=${date}`)
-    const data = await res.json()
-    setDayReactions(Array.isArray(data) ? data : [])
+    try {
+      const res = await fetch(`/api/reactions?petId=${petId}&date=${date}`)
+      const data = await res.json()
+      setDayReactions(Array.isArray(data) ? data : [])
+    } catch { setDayReactions([]) }
   }, [])
 
   const loadCommunityRecs = useCallback(async (petId: string) => {
-    const res = await fetch(`/api/community/recs?petId=${petId}`)
-    const data = await res.json()
-    setCommunityRecs(Array.isArray(data) ? data : [])
+    try {
+      const res = await fetch(`/api/community/recs?petId=${petId}`)
+      const data = await res.json()
+      setCommunityRecs(Array.isArray(data) ? data : [])
+    } catch { setCommunityRecs([]) }
   }, [])
 
   const saveReaction = async (productId: string, rating: string) => {
@@ -377,16 +383,18 @@ export default function LogPage() {
       if (exists) return prev.map((r) => r.productId === productId ? { ...r, rating } : r)
       return [...prev, { id: 'tmp', productId, rating }]
     })
-    await fetch('/api/reactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ petId: currentPetId, productId, date: selectedDate, rating }),
-    })
-    await Promise.all([
-      loadDayReactions(currentPetId, selectedDate),
-      loadCommunityRecs(currentPetId),
-    ])
-    setReactionSaving(null)
+    try {
+      await fetch('/api/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ petId: currentPetId, productId, date: selectedDate, rating }),
+      })
+      await Promise.all([
+        loadDayReactions(currentPetId, selectedDate),
+        loadCommunityRecs(currentPetId),
+      ])
+    } catch { /* ignore — optimistic update already applied */ }
+    finally { setReactionSaving(null) }
   }
 
   const dismissRec = async (recId: string) => {
