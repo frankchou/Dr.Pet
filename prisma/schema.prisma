@@ -41,6 +41,7 @@ model Pet {
   weeklyTasks          WeeklyTask[]
   nutritionAnalyses    NutritionAnalysis[]
   productRecommendationResults ProductRecommendationResult[]
+  instantAnalyses      InstantAnalysis[]
   petProducts          PetProduct[]
   productReactions     ProductReaction[]
   communityRecs        CommunityRec[]
@@ -195,4 +196,15 @@ model ProductRecommendationResult {
   pet        Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
   resultJson String   // JSON array of ProductRec[]
   createdAt  DateTime @default(now())
+}
+
+model InstantAnalysis {
+  id          String   @id @default(cuid())
+  petId       String
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  verdict     String   // 'safe' | 'caution' | 'danger'
+  summary     String
+  resultJson  String   // full JSON with concerns, positives, ingredients
+  imagePath   String?  // saved image path in /public/uploads/
+  createdAt   DateTime @default(now())
 }
