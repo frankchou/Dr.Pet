@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import { productTypeLabel } from '@/lib/utils'
 
 interface Product {
@@ -31,7 +30,6 @@ interface Pet {
 const SPECIES_EMOJI: Record<string, string> = { dog: '🐶', cat: '🐱' }
 
 export default function ProductsPage() {
-  const router = useRouter()
   const [pets, setPets] = useState<Pet[]>([])
   const [currentPetId, setCurrentPetId] = useState<string>('')
   const [items, setItems] = useState<PetProduct[]>([])
@@ -200,16 +198,14 @@ export default function ProductsPage() {
   const displayed = items.filter(i => i.listType === tab)
 
   return (
-    <div className="min-h-screen bg-[#F8F9FF] pb-36">
+    <div className="min-h-screen bg-[#FAF7F2] pb-36">
       {/* ── Sticky header ── */}
-      <div className="bg-white px-4 pt-12 pb-3 shadow-sm sticky top-0 z-10">
-        <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => router.back()} className="text-gray-400">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
-              <path d="M19 12H5M12 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-bold text-gray-900">產品清單管理</h1>
+      <div className="bg-white px-4 pt-10 pb-3 border-b border-[#E8DDD5] sticky top-0 z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🛒</span>
+            <h1 className="text-lg font-bold text-[#2C1810]">產品管理</h1>
+          </div>
         </div>
 
         {/* Pet selector */}
@@ -218,7 +214,7 @@ export default function ProductsPage() {
             {pets.map(p => (
               <button key={p.id} onClick={() => setCurrentPetId(p.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  currentPetId === p.id ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]' : 'bg-white text-gray-600 border-gray-200'
+                  currentPetId === p.id ? 'bg-[#C4714A] text-white border-[#C4714A]' : 'bg-white text-gray-600 border-gray-200'
                 }`}>
                 <span>{SPECIES_EMOJI[p.species] || '🐾'}</span>
                 {p.name}
@@ -232,11 +228,11 @@ export default function ProductsPage() {
           {(['fixed', 'trial'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                tab === t ? 'bg-white text-[#4F7CFF] shadow-sm' : 'text-gray-500'
+                tab === t ? 'bg-white text-[#C4714A] shadow-sm' : 'text-[#8B7355]'
               }`}>
               {t === 'fixed' ? '🏠 固定清單' : '🧪 試用清單'}
               <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                tab === t ? 'bg-[#4F7CFF]/10 text-[#4F7CFF]' : 'bg-gray-200 text-gray-500'
+                tab === t ? 'bg-[#C4714A]/10 text-[#C4714A]' : 'bg-[#E8DDD5] text-[#8B7355]'
               }`}>
                 {items.filter(i => i.listType === t).length}
               </span>
@@ -282,8 +278,8 @@ export default function ProductsPage() {
                           <div className="flex items-center gap-1.5">
                             <input value={editReason} onChange={e => setEditReason(e.target.value)}
                               placeholder="試用原因…"
-                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#4F7CFF]/40" />
-                            <button onClick={() => handleSaveReason(item.id)} className="text-xs text-[#4F7CFF] font-medium px-2 py-1 bg-blue-50 rounded-lg">儲存</button>
+                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#C4714A]/40" />
+                            <button onClick={() => handleSaveReason(item.id)} className="text-xs text-[#C4714A] font-medium px-2 py-1 bg-[#FFF5EF] rounded-lg">儲存</button>
                             <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">取消</button>
                           </div>
                         ) : (
@@ -302,7 +298,7 @@ export default function ProductsPage() {
                   <div className="flex flex-col gap-1.5 shrink-0">
                     {tab === 'fixed' ? (
                       <button onClick={() => handleMoveList(item, 'trial')}
-                        className="text-[10px] text-[#4F7CFF] bg-blue-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                        className="text-[10px] text-[#C4714A] bg-[#FFF5EF] px-2 py-1 rounded-lg whitespace-nowrap">
                         → 試用清單
                       </button>
                     ) : (
@@ -326,7 +322,7 @@ export default function ProductsPage() {
       {/* ── Sticky add button (above bottom nav) ── */}
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[calc(480px-2rem)] z-20">
         <button onClick={() => openAdd(tab)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#4F7CFF] text-white rounded-2xl font-medium text-sm shadow-lg active:opacity-90 transition-opacity">
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#C4714A] text-white rounded-2xl font-medium text-sm shadow-lg active:opacity-90 transition-opacity">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />
           </svg>
@@ -357,7 +353,7 @@ export default function ProductsPage() {
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
                 placeholder="搜尋產品名稱或品牌…"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40"
                 autoFocus
               />
             </div>
@@ -383,7 +379,7 @@ export default function ProductsPage() {
                           className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-3 transition-colors mb-1.5 ${
                             alreadyHere
                               ? 'bg-gray-50 opacity-50 cursor-not-allowed'
-                              : 'bg-gray-50 hover:bg-blue-50 active:bg-blue-100'
+                              : 'bg-gray-50 hover:bg-[#FFF5EF] active:bg-[#F0D5C4]'
                           }`}>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -395,7 +391,7 @@ export default function ProductsPage() {
                             {p.brand && <p className="text-xs text-gray-400 mt-0.5">{p.brand}</p>}
                           </div>
                           {alreadyHere && (
-                            <span className="text-[10px] bg-[#4F7CFF]/10 text-[#4F7CFF] px-1.5 py-0.5 rounded shrink-0">
+                            <span className="text-[10px] bg-[#C4714A]/10 text-[#C4714A] px-1.5 py-0.5 rounded shrink-0">
                               {addListType === 'trial' && status === 'fixed' ? '已在固定清單' : '已在清單'}
                             </span>
                           )}
@@ -420,7 +416,7 @@ export default function ProductsPage() {
               /* ── Step: confirm + (trial reason) ── */
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                 {/* Selected product card */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-3 flex items-center justify-between">
+                <div className="bg-[#FFF5EF] border border-[#F0D5C4] rounded-xl px-3 py-3 flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] bg-white text-gray-500 px-1.5 py-0.5 rounded border border-gray-100">
@@ -445,14 +441,14 @@ export default function ProductsPage() {
                     <input type="text" value={trialReason}
                       onChange={e => setTrialReason(e.target.value)}
                       placeholder="例：想改善皮膚問題、獸醫建議嘗試此配方…"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40"
                       autoFocus
                     />
                   </div>
                 )}
 
                 <button onClick={handleAddToList} disabled={saving}
-                  className="w-full bg-[#4F7CFF] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 active:opacity-90 transition-opacity">
+                  className="w-full bg-[#C4714A] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 active:opacity-90 transition-opacity">
                   {saving ? '新增中…' : `加入${addListType === 'fixed' ? '固定' : '試用'}清單`}
                 </button>
               </div>

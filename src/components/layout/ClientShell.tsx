@@ -59,7 +59,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
               onChange={(e) => setNickname(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               placeholder="例：小花媽咪、毛孩老爸"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40 focus:border-[#4F7CFF]"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40 focus:border-[#C4714A]"
               autoFocus
             />
             <p className="text-[11px] text-gray-400 mt-1.5">
@@ -71,7 +71,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="w-full bg-[#4F7CFF] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 active:opacity-90 transition-opacity"
+            className="w-full bg-[#C4714A] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-60 active:opacity-90 transition-opacity"
           >
             {saving ? '設定中…' : '開始使用'}
           </button>

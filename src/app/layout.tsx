@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <body className="antialiased">
-        <div className="min-h-screen bg-[#F8F9FF]">
+        <div className="min-h-screen bg-[#FAF7F2]">
           <div className="max-w-[480px] mx-auto min-h-screen relative">
             <ClientShell>
               <main className="pb-20">{children}</main>

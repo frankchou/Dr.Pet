@@ -164,7 +164,7 @@ export default function PetDetailPage() {
     <div>
       <PageHeader
         title="寵物資料"
-        backHref="/pet"
+        backHref="/"
         rightElement={
           <button
             onClick={() => { setEditing(!editing); setAvatarFile(null); setAvatarPreview(null) }}

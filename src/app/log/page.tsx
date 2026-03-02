@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/Card'
-import PageHeader from '@/components/layout/PageHeader'
 import { Select, Textarea } from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import ProductEditModal from '@/components/product/ProductEditModal'
@@ -113,9 +112,9 @@ function MonthCalendar({
             >
               <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-colors ${
                 isSelected
-                  ? 'bg-[#4F7CFF] text-white'
+                  ? 'bg-[#C4714A] text-white'
                   : isToday
-                  ? 'bg-blue-50 text-[#4F7CFF] font-bold ring-1 ring-[#4F7CFF]/30'
+                  ? 'bg-[#FFF5EF] text-[#C4714A] font-bold ring-1 ring-[#C4714A]/30'
                   : isSunday
                   ? 'text-red-400 hover:bg-gray-100'
                   : 'text-gray-700 hover:bg-gray-100'
@@ -123,7 +122,7 @@ function MonthCalendar({
                 {day}
               </span>
               {hasRecord && (
-                <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/80' : 'bg-[#4F7CFF]'}`} />
+                <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/80' : 'bg-[#C4714A]'}`} />
               )}
             </button>
           )
@@ -197,7 +196,7 @@ function DailyReactionSection({
       <p className="text-sm font-semibold text-gray-700 mb-0.5">今日吃後感想</p>
       <p className="text-xs text-gray-400">
         尚未建立產品清單，
-        <Link href="/products" className="text-[#4F7CFF] underline-offset-2">前往新增</Link>
+        <Link href="/products" className="text-[#C4714A] underline-offset-2">前往新增</Link>
       </p>
     </div>
   )
@@ -212,7 +211,7 @@ function DailyReactionSection({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-4 py-2.5 border-b border-gray-50 flex items-center justify-between">
         <p className="text-sm font-semibold text-gray-700">今日吃後感想</p>
-        <Link href="/products" className="text-xs text-[#4F7CFF]">管理清單</Link>
+        <Link href="/products" className="text-xs text-[#C4714A]">管理清單</Link>
       </div>
       <div className="divide-y divide-gray-50">
         {petProducts.map((pp) => {
@@ -233,7 +232,7 @@ function DailyReactionSection({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {isSaving ? (
-                  <div className="w-4 h-4 border-2 border-gray-200 border-t-[#4F7CFF] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-gray-200 border-t-[#C4714A] rounded-full animate-spin" />
                 ) : (
                   (Object.keys(RATING_CONFIG) as ('good' | 'ok' | 'bad')[]).map((r) => {
                     const cfg = RATING_CONFIG[r]
@@ -269,7 +268,7 @@ function CommunityRecsPanel({
   if (recs.length === 0) return null
 
   return (
-    <div className="bg-gradient-to-br from-[#4F7CFF]/10 to-purple-50 rounded-2xl border border-[#4F7CFF]/20 overflow-hidden">
+    <div className="bg-gradient-to-br from-[#C4714A]/10 to-[#FFF5EF] rounded-2xl border border-[#C4714A]/20 overflow-hidden">
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3"
@@ -277,7 +276,7 @@ function CommunityRecsPanel({
         <div className="flex items-center gap-2">
           <span className="text-base">🌐</span>
           <span className="text-sm font-semibold text-gray-800">社群推薦</span>
-          <span className="text-[10px] bg-[#4F7CFF] text-white px-1.5 py-0.5 rounded-full font-medium">{recs.length}</span>
+          <span className="text-[10px] bg-[#C4714A] text-white px-1.5 py-0.5 rounded-full font-medium">{recs.length}</span>
         </div>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
           className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}>
@@ -446,13 +445,25 @@ export default function LogPage() {
   const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const weekCount = usages.filter((u) => new Date(u.date) >= sevenDaysAgo).length
 
+  const InlineHeader = () => (
+    <div className="bg-white sticky top-0 z-10 border-b border-[#E8DDD5]">
+      <div className="px-4 pt-10 pb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🐾</span>
+          <h1 className="text-lg font-bold text-[#2C1810]">健康日誌</h1>
+        </div>
+        <Link href="/log/new" className="text-sm text-[#C4714A] font-medium">新增</Link>
+      </div>
+    </div>
+  )
+
   if (!loading && pets.length === 0) {
     return (
       <div>
-        <PageHeader title="飲食日誌" />
+        <InlineHeader />
         <div className="px-4 py-12 text-center">
           <p className="text-gray-500 mb-4">請先建立寵物檔案</p>
-          <Link href="/pet/new" className="inline-block px-6 py-3 bg-[#4F7CFF] text-white rounded-xl font-medium text-sm">
+          <Link href="/pet/new" className="inline-block px-6 py-3 bg-[#C4714A] text-white rounded-xl font-medium text-sm">
             建立寵物檔案
           </Link>
         </div>
@@ -462,10 +473,7 @@ export default function LogPage() {
 
   return (
     <div>
-      <PageHeader
-        title="飲食日誌"
-        rightElement={<Link href="/log/new" className="text-sm text-[#4F7CFF] font-medium">新增</Link>}
-      />
+      <InlineHeader />
 
       <div className="px-4 py-4 space-y-4 pb-24">
         {/* Pet selector */}
@@ -474,7 +482,7 @@ export default function LogPage() {
             {pets.map((p) => (
               <button key={p.id} onClick={() => setCurrentPetId(p.id)}
                 className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors ${
-                  currentPetId === p.id ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]' : 'bg-white text-gray-600 border-gray-200'
+                  currentPetId === p.id ? 'bg-[#C4714A] text-white border-[#C4714A]' : 'bg-white text-gray-600 border-gray-200'
                 }`}>
                 {p.species === '狗' ? '🐕' : p.species === '貓' ? '🐈' : '🐾'} {p.name}
               </button>
@@ -488,7 +496,7 @@ export default function LogPage() {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">📖</div>
             <p className="text-gray-500 text-sm mb-4">尚無飲食記錄</p>
-            <Link href="/log/new" className="inline-block px-6 py-3 bg-[#4F7CFF] text-white rounded-xl font-medium text-sm">
+            <Link href="/log/new" className="inline-block px-6 py-3 bg-[#C4714A] text-white rounded-xl font-medium text-sm">
               新增第一筆記錄
             </Link>
           </div>
@@ -503,7 +511,7 @@ export default function LogPage() {
               ].map((s) => (
                 <Card key={s.label} className="text-center">
                   <CardContent className="py-2">
-                    <p className="text-xl font-bold text-[#4F7CFF]">{s.value}</p>
+                    <p className="text-xl font-bold text-[#C4714A]">{s.value}</p>
                     <p className="text-xs text-gray-500">{s.label}</p>
                   </CardContent>
                 </Card>
@@ -522,13 +530,13 @@ export default function LogPage() {
 
             {/* Selected date banner */}
             {selectedDate && (
-              <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-                <span className="text-xs font-medium text-[#4F7CFF] flex-1">
+              <div className="flex items-center gap-2 bg-[#FFF5EF] border border-[#F0D5C4] rounded-xl px-3 py-2">
+                <span className="text-xs font-medium text-[#C4714A] flex-1">
                   📅 {selectedDate} · {displayUsages.length} 筆記錄
                 </span>
                 <Link
                   href={`/log/new?date=${selectedDate}`}
-                  className="text-xs text-white bg-[#4F7CFF] px-2.5 py-1 rounded-lg font-medium shrink-0"
+                  className="text-xs text-white bg-[#C4714A] px-2.5 py-1 rounded-lg font-medium shrink-0"
                 >
                   + 新增此日
                 </Link>
@@ -557,7 +565,7 @@ export default function LogPage() {
                 <p className="text-gray-400 text-sm mb-3">此日尚無記錄</p>
                 <Link
                   href={`/log/new?date=${selectedDate}`}
-                  className="inline-block px-5 py-2.5 bg-[#4F7CFF] text-white rounded-xl font-medium text-sm"
+                  className="inline-block px-5 py-2.5 bg-[#C4714A] text-white rounded-xl font-medium text-sm"
                 >
                   新增此日記錄
                 </Link>
@@ -598,7 +606,7 @@ export default function LogPage() {
                                 <button
                                   title="編輯記錄"
                                   onClick={() => setEditingUsageId(editingUsageId === usage.id ? null : usage.id)}
-                                  className={`p-1.5 rounded-lg transition-colors ${editingUsageId === usage.id ? 'bg-blue-100 text-[#4F7CFF]' : 'text-gray-300 hover:text-[#4F7CFF] hover:bg-blue-50'}`}
+                                  className={`p-1.5 rounded-lg transition-colors ${editingUsageId === usage.id ? 'bg-[#F0D5C4] text-[#C4714A]' : 'text-gray-300 hover:text-[#C4714A] hover:bg-[#FFF5EF]'}`}
                                 >
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -651,20 +659,20 @@ export default function LogPage() {
             ))}
 
             <Link href="/log/new"
-              className="block text-center py-3 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 text-sm hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors">
+              className="block text-center py-3 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 text-sm hover:border-[#C4714A] hover:text-[#C4714A] transition-colors">
               + 新增記錄
             </Link>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <Link href="/upload" className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl border border-gray-200 hover:border-[#4F7CFF] transition-colors">
+              <Link href="/upload" className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl border border-gray-200 hover:border-[#C4714A] transition-colors">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-[#FF8C42] shrink-0">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
                 <span className="text-xs text-gray-600">上傳成分表</span>
               </Link>
-              <Link href="/analysis" className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl border border-gray-200 hover:border-[#4F7CFF] transition-colors">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-[#4F7CFF] shrink-0">
+              <Link href="/analysis" className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl border border-gray-200 hover:border-[#C4714A] transition-colors">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-[#C4714A] shrink-0">
                   <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
                 </svg>
                 <span className="text-xs text-gray-600">成分綜合分析</span>

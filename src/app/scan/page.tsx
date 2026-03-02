@@ -217,18 +217,21 @@ export default function ScanPage() {
   const currentPet = pets.find(p => p.id === currentPetId)
 
   return (
-    <div className="min-h-screen bg-[#F8F9FF] pb-24">
+    <div className="min-h-screen bg-[#FAF7F2] pb-24">
       {/* ── Header ── */}
-      <div className="bg-white px-4 pt-12 pb-3 shadow-sm sticky top-0 z-10">
+      <div className="bg-white px-4 pt-10 pb-3 border-b border-[#E8DDD5] sticky top-0 z-10">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-gray-900">即時分析</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📷</span>
+            <h1 className="text-lg font-bold text-[#2C1810]">即時分析</h1>
+          </div>
           <button onClick={openUpload}
-            className="flex items-center gap-1.5 bg-[#4F7CFF] text-white px-3 py-1.5 rounded-xl text-sm font-medium active:opacity-90">
+            className="flex items-center gap-1.5 bg-[#C4714A] text-white px-3 py-1.5 rounded-xl text-sm font-medium active:opacity-90">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
               <circle cx="12" cy="13" r="4" />
             </svg>
-            新增分析
+            AI 即時分析
           </button>
         </div>
 
@@ -238,7 +241,7 @@ export default function ScanPage() {
             {pets.map(p => (
               <button key={p.id} onClick={() => setCurrentPetId(p.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  currentPetId === p.id ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]' : 'bg-white text-gray-600 border-gray-200'
+                  currentPetId === p.id ? 'bg-[#C4714A] text-white border-[#C4714A]' : 'bg-white text-gray-600 border-gray-200'
                 }`}>
                 <span>{SPECIES_EMOJI[p.species] || '🐾'}</span>
                 {p.name}
@@ -262,7 +265,7 @@ export default function ScanPage() {
             <p className="text-sm font-medium">尚無分析紀錄</p>
             <p className="text-xs text-gray-300 mt-1">拍照或上傳成分標籤，即時了解產品是否適合你的寵物</p>
             <button onClick={openUpload}
-              className="mt-5 px-5 py-2.5 bg-[#4F7CFF] text-white rounded-xl text-sm font-medium active:opacity-90">
+              className="mt-5 px-5 py-2.5 bg-[#C4714A] text-white rounded-xl text-sm font-medium active:opacity-90">
               開始第一次分析
             </button>
           </div>
@@ -460,7 +463,7 @@ export default function ScanPage() {
               {result && !savedToTrial && !showSaveForm && (
                 <button
                   onClick={() => setShowSaveForm(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-[#4F7CFF]/30 bg-blue-50 text-[#4F7CFF] text-sm font-medium active:opacity-80">
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-[#C4714A]/30 bg-[#FFF5EF] text-[#C4714A] text-sm font-medium active:opacity-80">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                     <path d="M12 5v14M5 12h14" />
                   </svg>
@@ -470,8 +473,8 @@ export default function ScanPage() {
 
               {/* Save-to-trial form */}
               {result && showSaveForm && !savedToTrial && (
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-[#4F7CFF]">🧪 加入試用清單</p>
+                <div className="bg-[#FFF5EF] border border-[#F0D5C4] rounded-2xl p-4 space-y-3">
+                  <p className="text-xs font-semibold text-[#C4714A]">🧪 加入試用清單</p>
 
                   <div>
                     <label className="block text-[10px] font-medium text-gray-500 mb-1">產品名稱 *</label>
@@ -479,7 +482,7 @@ export default function ScanPage() {
                       value={saveProductName}
                       onChange={e => setSaveProductName(e.target.value)}
                       placeholder="輸入產品名稱"
-                      className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                      className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40"
                     />
                   </div>
 
@@ -490,7 +493,7 @@ export default function ScanPage() {
                         value={saveBrand}
                         onChange={e => setSaveBrand(e.target.value)}
                         placeholder="品牌名稱"
-                        className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                        className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40"
                       />
                     </div>
                     <div>
@@ -498,7 +501,7 @@ export default function ScanPage() {
                       <select
                         value={saveType}
                         onChange={e => setSaveType(e.target.value)}
-                        className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40">
+                        className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40">
                         {PRODUCT_TYPES.map(t => (
                           <option key={t.value} value={t.value}>{t.label}</option>
                         ))}
@@ -512,7 +515,7 @@ export default function ScanPage() {
                       value={saveReason}
                       onChange={e => setSaveReason(e.target.value)}
                       placeholder="例：AI 分析適合，想觀察反應"
-                      className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F7CFF]/40"
+                      className="w-full border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/40"
                     />
                   </div>
 
@@ -525,7 +528,7 @@ export default function ScanPage() {
                     <button
                       onClick={handleSaveToTrial}
                       disabled={!saveProductName.trim() || saving}
-                      className="flex-1 py-2.5 rounded-xl bg-[#4F7CFF] text-white text-sm font-medium disabled:opacity-40 active:opacity-90">
+                      className="flex-1 py-2.5 rounded-xl bg-[#C4714A] text-white text-sm font-medium disabled:opacity-40 active:opacity-90">
                       {saving ? '儲存中…' : '確認加入'}
                     </button>
                   </div>
@@ -537,7 +540,7 @@ export default function ScanPage() {
                 <button
                   onClick={handleAnalyze}
                   disabled={!file || analyzing}
-                  className="w-full bg-[#4F7CFF] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-40 active:opacity-90 flex items-center justify-center gap-2">
+                  className="w-full bg-[#C4714A] text-white rounded-xl py-3.5 font-medium text-sm disabled:opacity-40 active:opacity-90 flex items-center justify-center gap-2">
                   {analyzing ? (
                     <>
                       <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">

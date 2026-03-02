@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import PageHeader from '@/components/layout/PageHeader'
 import Button from '@/components/ui/Button'
 import type { Pet } from '@/types'
 
@@ -110,16 +109,19 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen -mb-20">
-      <PageHeader
-        title="AI 健康對話"
-        rightElement={
-          messages.length > 0 ? (
+      <div className="bg-white border-b border-[#E8DDD5] shrink-0">
+        <div className="px-4 pt-10 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <h1 className="text-lg font-bold text-[#2C1810]">AI 營養師</h1>
+          </div>
+          {messages.length > 0 && (
             <button onClick={handleClearHistory} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
               清除記錄
             </button>
-          ) : undefined
-        }
-      />
+          )}
+        </div>
+      </div>
 
       {/* Disclaimer */}
       <div className="mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl p-2.5 shrink-0">
@@ -134,7 +136,7 @@ export default function ChatPage() {
               <button key={pet.id}
                 onClick={() => { setCurrentPet(pet); loadHistory(pet.id) }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors ${
-                  currentPet?.id === pet.id ? 'bg-[#4F7CFF] text-white border-[#4F7CFF]' : 'bg-white text-gray-600 border-gray-200'
+                  currentPet?.id === pet.id ? 'bg-[#C4714A] text-white border-[#C4714A]' : 'bg-white text-gray-600 border-gray-200'
                 }`}
               >
                 <span>{pet.species === '狗' ? '🐕' : pet.species === '貓' ? '🐈' : '🐾'}</span>
@@ -151,7 +153,7 @@ export default function ChatPage() {
         {/* 載入中 */}
         {historyLoading && (
           <div className="text-center py-8">
-            <div className="w-5 h-5 border-2 border-[#4F7CFF] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <div className="w-5 h-5 border-2 border-[#C4714A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             <p className="text-xs text-gray-400">載入對話記錄中...</p>
           </div>
         )}
@@ -171,7 +173,7 @@ export default function ChatPage() {
                     '推薦適合的飲食調整方向',
                   ].map((s) => (
                     <button key={s} onClick={() => sendMessage(s)}
-                      className="block w-full text-left px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm text-gray-600 hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors"
+                      className="block w-full text-left px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm text-gray-600 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors"
                     >{s}</button>
                   ))}
                 </div>
@@ -195,10 +197,10 @@ export default function ChatPage() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-full bg-[#4F7CFF] flex items-center justify-center text-white text-xs mr-2 shrink-0 mt-0.5">🤖</div>
+              <div className="w-7 h-7 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-xs mr-2 shrink-0 mt-0.5">🤖</div>
             )}
             <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
-              msg.role === 'user' ? 'bg-[#4F7CFF] text-white rounded-tr-sm' : 'bg-white text-[#1a1a2e] shadow-sm rounded-tl-sm'
+              msg.role === 'user' ? 'bg-[#C4714A] text-white rounded-tr-sm' : 'bg-white text-[#1a1a2e] shadow-sm rounded-tl-sm'
             }`}>
               {msg.content}
             </div>
@@ -208,7 +210,7 @@ export default function ChatPage() {
         {/* 打字中 */}
         {loading && (
           <div className="flex justify-start">
-            <div className="w-7 h-7 rounded-full bg-[#4F7CFF] flex items-center justify-center text-white text-xs mr-2 shrink-0">🤖</div>
+            <div className="w-7 h-7 rounded-full bg-[#4CAF50] flex items-center justify-center text-white text-xs mr-2 shrink-0">🤖</div>
             <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm">
               <div className="flex gap-1">
                 {[0, 1, 2].map((i) => (
@@ -237,10 +239,10 @@ export default function ChatPage() {
           <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
             placeholder={currentPet ? `詢問關於 ${currentPet.name} 的問題...` : '請先建立寵物檔案'}
             disabled={!currentPet || loading}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#4F7CFF] disabled:bg-gray-50"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#C4714A] disabled:bg-gray-50"
           />
           <button type="submit" disabled={!input.trim() || loading || !currentPet}
-            className="px-4 py-2.5 bg-[#4F7CFF] text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-[#3d6ae8] transition-colors"
+            className="px-4 py-2.5 bg-[#C4714A] text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-[#b06040] transition-colors"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
