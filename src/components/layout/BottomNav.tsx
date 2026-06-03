@@ -1,7 +1,7 @@
 'use client'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
 
 const NAV_ITEMS = [
   {
@@ -78,13 +78,26 @@ export default function BottomNav() {
   const isActive = (href: string): boolean => {
     const p = pendingHref ?? pathname
     if (href === '/') return p === '/'
-    return p.startsWith(href)
+    return p === href || p.startsWith(href + '/')
   }
 
-  const linkClass = (href: string): string =>
-    `flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${
-      isActive(href) ? 'text-[#111111]' : 'text-slate-400'
-    }`
+  const NavItem = ({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) => {
+    const active = isActive(href)
+    return (
+      <Link
+        href={href}
+        onClick={() => setPendingHref(href)}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
+      >
+        <div className={`p-1.5 rounded-2xl transition-all ${active ? 'bg-[#111111] text-white' : 'text-slate-400'}`}>
+          {icon}
+        </div>
+        <span className={`text-[10px] font-semibold transition-colors ${active ? 'text-[#111111]' : 'text-slate-400'}`}>
+          {label}
+        </span>
+      </Link>
+    )
+  }
 
   return (
     <nav
@@ -94,15 +107,7 @@ export default function BottomNav() {
       <div className="flex items-end h-[60px]">
         {/* 左側三個 tab */}
         {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setPendingHref(item.href)}
-            className={linkClass(item.href)}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
+          <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} />
         ))}
 
         {/* 中央凸起相機 FAB */}
@@ -122,15 +127,7 @@ export default function BottomNav() {
 
         {/* 右側兩個 tab */}
         {RIGHT_NAV_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setPendingHref(item.href)}
-            className={linkClass(item.href)}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
+          <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} />
         ))}
       </div>
     </nav>

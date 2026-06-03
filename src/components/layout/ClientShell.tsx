@@ -259,7 +259,7 @@ function LoginPage() {
             </li>
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#D98A53] flex-shrink-0" />
-              AI 營養師個人化飲食建議
+              AI 諮詢個人化飲食建議
             </li>
           </ul>
         </div>
@@ -329,14 +329,17 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       localStorage.setItem('drpet_userId', session.user.id)
       localStorage.setItem('drpet_nickname', session.user.name ?? '飼主')
 
-      // 首次登入後若尚未同意免責聲明，顯示彈窗
-      const disclaimerAck = localStorage.getItem('purepaw_disclaimer_ack_v1')
+      // 免責聲明：by-user 儲存，換帳號時每個帳號都要重新同意
+      const userId = session.user.id
+      const disclaimerKey = `purepaw_disclaimer_ack_v1_${userId}`
+      const disclaimerAck = localStorage.getItem(disclaimerKey)
       if (!disclaimerAck && !isPublicPath) setShowDisclaimer(true)
     }
   }, [status, session, isPublicPath])
 
   const handleAgree = () => {
-    localStorage.setItem('purepaw_disclaimer_ack_v1', '1')
+    const userId = session?.user?.id
+    if (userId) localStorage.setItem(`purepaw_disclaimer_ack_v1_${userId}`, '1')
     setShowDisclaimer(false)
   }
 

@@ -4,20 +4,29 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const petId = searchParams.get('petId')
-    const date = searchParams.get('date')
+    const petId     = searchParams.get('petId')
+    const date      = searchParams.get('date')
+    const yearMonth = searchParams.get('yearMonth')  // YYYY-MM，回傳整月所有紀錄
 
-    if (!petId || !date) {
-      return NextResponse.json(
-        { error: 'petId and date are required' },
-        { status: 400 }
-      )
+    if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    // 整月查詢
+    if (yearMonth) {
+      const logs = await prisma.dailyHealthLog.findMany({
+        where: {
+          petId,
+          date: { gte: `${yearMonth}-01`, lte: `${yearMonth}-31` },
+        },
+        orderBy: { date: 'asc' },
+      })
+      return NextResponse.json(logs)
     }
 
+    // 單日查詢
+    if (!date) return NextResponse.json({ error: 'date or yearMonth is required' }, { status: 400 })
     const log = await prisma.dailyHealthLog.findUnique({
       where: { petId_date: { petId, date } },
     })
-
     return NextResponse.json(log)
   } catch (error) {
     console.error('GET /api/daily-health-log error:', error)

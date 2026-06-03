@@ -21,26 +21,13 @@ interface PetFormState {
   isNew?: boolean
 }
 
-interface RecordParam {
-  id: string
-  label: string
-  enabled: boolean
-}
+import { DEFAULT_RECORD_PARAMS } from '@/hooks/useRecordParams'
+import type { RecordParam } from '@/hooks/useRecordParams'
 
-const DEFAULT_RECORD_PARAMS: RecordParam[] = [
-  { id: '1',  label: '日常飲食紀錄',     enabled: true  },
-  { id: '2',  label: '用藥與看診',       enabled: true  },
-  { id: '3',  label: '洗澡美容',         enabled: true  },
-  { id: '4',  label: '體重追蹤',         enabled: false },
-  { id: '5',  label: '飲水量',           enabled: false },
-  { id: '6',  label: '活動量與散步',     enabled: true  },
-  { id: '7',  label: '嘔吐 / 毛球',      enabled: true  },
-  { id: '8',  label: '排泄狀況',         enabled: true  },
-  { id: '9',  label: '睡眠品質',         enabled: true  },
-  { id: '10', label: '換食計畫追蹤',     enabled: true  },
-  { id: '11', label: '異常症狀',         enabled: true  },
-  { id: '12', label: '備註與心情',       enabled: false },
-  { id: '13', label: '我的標籤',         enabled: true  },
+const PARAM_GROUPS: Array<{ key: 'shortcuts' | 'daily' | 'symptoms'; label: string }> = [
+  { key: 'shortcuts', label: '快捷紀錄' },
+  { key: 'daily',     label: '每日健康填寫' },
+  { key: 'symptoms',  label: '症狀觀察' },
 ]
 
 // ─── Inline SVG 圖示 ─────────────────────────────────────────────────────────
@@ -369,10 +356,11 @@ interface PetCardProps {
   pet: PetFormState
   onUpdate: (field: keyof PetFormState, value: string | boolean) => void
   onSave: () => void
+  onCancel?: () => void
   saving: boolean
 }
 
-function PetCard({ pet, onUpdate, onSave, saving }: PetCardProps) {
+function PetCard({ pet, onUpdate, onSave, onCancel, saving }: PetCardProps) {
   const inputCls =
     'w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#111111]/10 focus:outline-none transition-all'
 
@@ -520,8 +508,8 @@ function PetCard({ pet, onUpdate, onSave, saving }: PetCardProps) {
           </div>
         </div>
 
-        {/* 儲存按鈕 */}
-        <div className="pt-4">
+        {/* 儲存 / 放棄按鈕 */}
+        <div className="pt-4 space-y-2">
           <button
             onClick={onSave}
             disabled={saving}
@@ -536,6 +524,14 @@ function PetCard({ pet, onUpdate, onSave, saving }: PetCardProps) {
               '儲存檔案'
             )}
           </button>
+          {pet.isNew && onCancel && (
+            <button
+              onClick={onCancel}
+              className="w-full bg-slate-100 text-slate-600 font-bold rounded-2xl py-3 hover:bg-slate-200 transition-colors text-sm"
+            >
+              放棄新增
+            </button>
+          )}
         </div>
 
         {/* 共同飼主管理（已儲存的 pet 才顯示） */}
@@ -554,19 +550,21 @@ export default function SettingsPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  const [recordParams, setRecordParams] = useState<RecordParam[]>(() => {
-    // 初始值延遲讀取（避免 SSR 問題，useEffect 中覆蓋）
-    return DEFAULT_RECORD_PARAMS
-  })
+  const [recordParams, setRecordParams] = useState<RecordParam[]>(DEFAULT_RECORD_PARAMS)
 
   const carouselRef = useRef<HTMLDivElement>(null)
 
-  // 載入 localStorage 紀錄參數
+  // 載入 localStorage 紀錄參數（含舊格式遷移，由 useRecordParams 邏輯統一處理）
   useEffect(() => {
     try {
       const stored = localStorage.getItem('purepaw_record_params')
-      if (stored) setRecordParams(JSON.parse(stored) as RecordParam[])
-    } catch { /* 若解析失敗使用預設值 */ }
+      if (!stored) return
+      const parsed = JSON.parse(stored) as Array<{ id: string; enabled: boolean }>
+      const storedMap = Object.fromEntries(parsed.map(p => [p.id, p.enabled]))
+      setRecordParams(DEFAULT_RECORD_PARAMS.map(p =>
+        p.id in storedMap ? { ...p, enabled: storedMap[p.id] } : p
+      ))
+    } catch { /* 解析失敗使用預設值 */ }
   }, [])
 
   // 載入寵物列表
@@ -660,12 +658,20 @@ export default function SettingsPage() {
       isNew: true,
     }
     setPets(prev => [...prev, newPet])
-    // 滾動到最後一張（新增卡片前一張）
+    // 捲動到新增的毛孩卡片（最後一張 data-pet-card），而非「新增」按鈕
     setTimeout(() => {
       const el = carouselRef.current
       if (!el) return
-      el.scrollLeft = el.scrollWidth
-    }, 100)
+      const cards = el.querySelectorAll('[data-pet-card]')
+      const lastCard = cards[cards.length - 1] as HTMLElement | null
+      if (lastCard) {
+        lastCard.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+      }
+    }, 80)
+  }
+
+  const cancelNewPet = (id: string) => {
+    setPets(prev => prev.filter(p => p.id !== id))
   }
 
   const scrollPets = (dir: -1 | 1) => {
@@ -761,6 +767,7 @@ export default function SettingsPage() {
                     pet={pet}
                     onUpdate={(field, value) => updatePet(pet.id, field, value)}
                     onSave={() => savePet(pet)}
+                    onCancel={pet.isNew ? () => cancelNewPet(pet.id) : undefined}
                     saving={savingId === pet.id}
                   />
                 ))}
@@ -785,43 +792,43 @@ export default function SettingsPage() {
 
       {/* Tab 2: 紀錄參數設定 */}
       {tab === 'params' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="mb-6">
-            <p className="text-sm font-bold text-slate-600 leading-relaxed bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-              點選以隱藏或顯示以下項目。<br />
-              按下並拖曳項目以調整日誌表單中的順序。
-            </p>
-          </div>
-          <div className="flex-1 bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-            {recordParams.map((param, i) => (
-              <div
-                key={param.id}
-                className={`flex items-center justify-between p-4 ${
-                  i !== recordParams.length - 1 ? 'border-b border-slate-50' : ''
-                }`}
-              >
-                <span className="text-sm font-bold text-slate-800">{param.label}</span>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => toggleParam(param.id)}
-                    className={`w-[48px] h-7 rounded-full relative transition-colors duration-300 ${
-                      param.enabled ? 'bg-[#111111]' : 'bg-slate-200'
-                    }`}
-                    aria-label={param.enabled ? '關閉' : '開啟'}
-                  >
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            開啟或關閉各項目，可自訂日誌頁顯示的記錄功能。
+          </p>
+          {PARAM_GROUPS.map(group => {
+            const groupParams = recordParams.filter(p => (p as RecordParam & { group: string }).group === group.key)
+            return (
+              <div key={group.key}>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest px-1 mb-2">{group.label}</p>
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                  {groupParams.map((param, i) => (
                     <div
-                      className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
-                        param.enabled ? 'translate-x-5' : 'translate-x-0'
+                      key={param.id}
+                      className={`flex items-center justify-between px-4 py-3.5 ${
+                        i !== groupParams.length - 1 ? 'border-b border-slate-50' : ''
                       }`}
-                    />
-                  </button>
-                  <div className="text-slate-300 cursor-grab hover:text-slate-500 transition-colors">
-                    <SvgMenu />
-                  </div>
+                    >
+                      <span className="text-sm font-bold text-slate-800">{param.label}</span>
+                      <button
+                        onClick={() => toggleParam(param.id)}
+                        className={`w-[48px] h-7 rounded-full relative transition-colors duration-300 ${
+                          param.enabled ? 'bg-[#111111]' : 'bg-slate-200'
+                        }`}
+                        aria-label={param.enabled ? '關閉' : '開啟'}
+                      >
+                        <div
+                          className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                            param.enabled ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
 

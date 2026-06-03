@@ -1,21 +1,17 @@
 /**
  * Prisma seed 腳本 — 為 demo 帳號建立完整 mock 資料
- * 執行方式：DATABASE_URL="file:./prisma/dev.db" npx prisma db seed
- *
- * 使用 upsert 確保可重複執行不重複建立資料。
+ * 執行方式：npx prisma db seed
+ * 可重複執行（upsert 保護），不會重複新增。
  */
 
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 import path from 'path'
 
-// ─── 建立 Prisma 用戶端（複用 src/lib/prisma.ts 相同邏輯）─────────────────
-
 function resolveDbUrl(): string {
   const raw = process.env.DATABASE_URL || `file:${path.join(process.cwd(), 'dev.db')}`
   if (raw.startsWith('file:') && !raw.startsWith('file:/')) {
-    const relative = raw.replace(/^file:/, '')
-    return `file:${path.resolve(process.cwd(), relative)}`
+    return `file:${path.resolve(process.cwd(), raw.replace(/^file:/, ''))}`
   }
   return raw
 }
@@ -25,229 +21,239 @@ const authToken = process.env.DATABASE_AUTH_TOKEN
 const adapter = new PrismaLibSql(authToken ? { url, authToken } : { url })
 const prisma = new PrismaClient({ adapter })
 
-// ─── 常數 ────────────────────────────────────────────────────────────────────
+const DEMO_EMAIL    = 'demo@drpet.com'
+const DEMO_USER_ID  = 'demo-user'
+const DEMO_PET_ID   = 'demo-pet-pudding'
 
-const DEMO_USER_ID = 'demo-user'
-const DEMO_EMAIL = 'demo@drpet.com'
-
-function todayString(): string {
-  return new Date().toISOString().split('T')[0]
+function dateStr(offsetDays = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return d.toISOString().split('T')[0]
 }
 
-// ─── Seed 主流程 ──────────────────────────────────────────────────────────────
-
 async function main() {
-  console.log('開始 seed demo 資料…')
+  console.log('▶ 開始 seed demo 資料…')
 
-  // ── 1. User ──────────────────────────────────────────────────────────────
+  // ── 1. User ───────────────────────────────────────────────────────────────
   const user = await prisma.user.upsert({
-    where: { email: DEMO_EMAIL },
+    where:  { email: DEMO_EMAIL },
     update: {},
     create: {
-      id: DEMO_USER_ID,
-      name: '示範飼主',
-      email: DEMO_EMAIL,
+      id:       DEMO_USER_ID,
+      name:     '示範飼主',
+      email:    DEMO_EMAIL,
       nickname: 'demo_owner',
     },
   })
-  console.log(`User: ${user.id} (${user.email})`)
+  console.log(`  User: ${user.id}`)
 
-  // ── 2. Pet ───────────────────────────────────────────────────────────────
+  // ── 2. Pet ────────────────────────────────────────────────────────────────
   const pet = await prisma.pet.upsert({
-    where: { id: 'demo-pet-pudding' },
+    where:  { id: DEMO_PET_ID },
     update: {},
     create: {
-      id: 'demo-pet-pudding',
-      name: '布丁',
-      species: 'dog',
-      breed: '馬爾濟斯',
-      sex: 'female',
-      birthday: new Date('2021-03-15'),
-      weight: 3.2,
-      isNeutered: true,
+      id:           DEMO_PET_ID,
+      name:         '布丁',
+      species:      'dog',
+      breed:        '馬爾濟斯',
+      sex:          'female',
+      birthday:     new Date('2021-03-15'),
+      weight:       3.2,
+      isNeutered:   true,
       mainProblems: JSON.stringify(['digestive', 'skin']),
-      allergies: JSON.stringify(['雞肉', '牛肉']),
-      userId: user.id,
+      allergies:    JSON.stringify(['雞肉', '牛肉']),
+      userId:       user.id,
     },
   })
-  console.log(`Pet: ${pet.id} (${pet.name})`)
+  console.log(`  Pet: ${pet.id} (${pet.name})`)
 
-  // ── 3. DailyMealPlan（今日配餐） ─────────────────────────────────────────
-  const today = todayString()
-
-  // 先刪除今日舊資料再重建（DailyMealPlan → MealPlanItem 會 cascade 刪除）
-  const existingPlan = await prisma.dailyMealPlan.findUnique({
-    where: { petId_date: { petId: pet.id, date: today } },
-  })
-  if (existingPlan) {
-    await prisma.dailyMealPlan.delete({ where: { id: existingPlan.id } })
+  // ── 3. DailyHealthLog — 本月前 20 天（含今日）────────────────────────────
+  // 每次呼叫 dateStr 都重新計算，避免跨日誤差
+  // 分佈比例：60% 正常、20% 活動高/軟便、10% 疲倦/慢食/眼耳、10% 皮膚+消化異常
+  type LogTemplate = {
+    vitality: string
+    appetite: string
+    waterMl: number
+    waterStatus: string
+    stoolType: string
+    urineStatus: string
+    mood: string
+    skinHair: string
+    eyeEar: string
+    dental: string
+    digestion: string
+    respiratory: string
+    neuro: string
+    reproductive: string
+    dailyChecklist: string
+    dietStatusTab: string
+    mealStatuses: string
+    stoolDetails: string
   }
 
-  const mealPlan = await prisma.dailyMealPlan.create({
-    data: {
-      petId: pet.id,
-      date: today,
-      items: {
-        create: [
-          // 晨間
-          {
-            session: 'morning',
-            customName: '自然本色小型成犬亮白無穀鮭魚配方',
-            quantity: 2,
-            unit: '平匙',
-            tags: JSON.stringify(['狗飼料', '無穀']),
-            sortOrder: 0,
-          },
-          {
-            session: 'morning',
-            customName: '毛孩時代腸胃專科益生菌',
-            quantity: 2,
-            unit: '克',
-            tags: JSON.stringify(['保健品']),
-            sortOrder: 1,
-          },
-          {
-            session: 'morning',
-            customName: '新鮮花椰菜',
-            quantity: 1,
-            unit: '朵',
-            tags: JSON.stringify(['鮮食']),
-            sortOrder: 2,
-          },
-          // 晚間
-          {
-            session: 'evening',
-            customName: '自然本色亮白無穀鮭魚',
-            quantity: 2,
-            unit: '平匙',
-            tags: JSON.stringify(['狗飼料']),
-            sortOrder: 0,
-          },
-          {
-            session: 'evening',
-            customName: '毛孩時代腸胃專科益生菌',
-            quantity: 1,
-            unit: '克',
-            tags: JSON.stringify(['保健品']),
-            sortOrder: 1,
-          },
-          {
-            session: 'evening',
-            customName: '有機花椰菜',
-            quantity: 1,
-            unit: '朵',
-            tags: JSON.stringify(['鮮食']),
-            sortOrder: 2,
-          },
-        ],
-      },
+  function makeLog(offset: number): { date: string } & LogTemplate {
+    const date = dateStr(offset)
+    const idx = Math.abs(offset) % 10
+
+    // 0–5：正常（60%）
+    if (idx <= 5) {
+      return {
+        date, vitality: '精神飽滿', appetite: '食慾正常',
+        waterMl: 280 + (idx * 10), waterStatus: '飲水正常',
+        stoolType: '正常成形', stoolDetails: '[]', urineStatus: '尿量正常',
+        mood: JSON.stringify(['平靜放鬆']),
+        skinHair: '[]', eyeEar: '[]', dental: '[]', digestion: '[]',
+        respiratory: '[]', neuro: '[]', reproductive: '[]',
+        dailyChecklist: JSON.stringify(['刷牙清潔', '日常散步', '梳毛護理']),
+        dietStatusTab: 'all', mealStatuses: '{}',
+      }
+    }
+    // 6–7：活動意願高 + 軟便（20%）
+    if (idx <= 7) {
+      return {
+        date, vitality: '活動意願高', appetite: '胃口極佳',
+        waterMl: 310, waterStatus: '飲水正常',
+        stoolType: '軟便', stoolDetails: '[]', urineStatus: '尿量正常',
+        mood: JSON.stringify(['活潑好動']),
+        skinHair: '[]', eyeEar: '[]', dental: '[]', digestion: '[]',
+        respiratory: '[]', neuro: '[]', reproductive: '[]',
+        dailyChecklist: JSON.stringify(['日常散步']),
+        dietStatusTab: 'all', mealStatuses: '{}',
+      }
+    }
+    // 8：疲倦 + 慢食 + 眼耳（10%）
+    if (idx === 8) {
+      return {
+        date, vitality: '異常疲倦', appetite: '猶豫慢食',
+        waterMl: 150, waterStatus: '幾乎沒喝',
+        stoolType: '正常成形', stoolDetails: '[]', urineStatus: '頻尿蹲',
+        mood: '[]',
+        skinHair: '[]', eyeEar: JSON.stringify(['流淚淚痕']),
+        dental: '[]', digestion: '[]', respiratory: '[]', neuro: '[]', reproductive: '[]',
+        dailyChecklist: JSON.stringify(['梳毛護理']),
+        dietStatusTab: 'reduced',
+        mealStatuses: JSON.stringify({ morning: 'done', evening: 'reduced' }),
+      }
+    }
+    // 9：皮膚 + 消化異常（10%）
+    return {
+      date, vitality: '精神飽滿', appetite: '挑食偏食',
+      waterMl: 200, waterStatus: '飲水正常',
+      stoolType: '帶黏液', stoolDetails: '[]', urineStatus: '尿量正常',
+      mood: JSON.stringify(['焦躁不安']),
+      skinHair: JSON.stringify(['頻繁抓搔', '掉毛嚴重']),
+      eyeEar: '[]', dental: '[]',
+      digestion: JSON.stringify(['嘔吐']),
+      respiratory: '[]', neuro: '[]', reproductive: '[]',
+      dailyChecklist: JSON.stringify(['梳毛護理']),
+      dietStatusTab: 'reduced',
+      mealStatuses: JSON.stringify({ morning: 'done', evening: 'refused' }),
+    }
+  }
+
+  let healthLogCount = 0
+  for (let offset = -19; offset <= 0; offset++) {
+    const log = makeLog(offset)
+    await prisma.dailyHealthLog.upsert({
+      where:  { petId_date: { petId: pet.id, date: log.date } },
+      update: log,
+      create: { petId: pet.id, ...log },
+    })
+    healthLogCount++
+  }
+  console.log(`  DailyHealthLog: ${healthLogCount} 筆（本月前 20 天）`)
+
+  // ── 4. HealthMetric（今日）────────────────────────────────────────────────
+  await prisma.healthMetric.upsert({
+    where:  { petId_date: { petId: pet.id, date: dateStr(0) } },
+    update: { vitality: 'high', waterIntake: 'medium', bodyScore: 5 },
+    create: { petId: pet.id, date: dateStr(0), vitality: 'high', waterIntake: 'medium', bodyScore: 5 },
+  })
+  console.log('  HealthMetric: 今日已建立')
+
+  // ── 5. MeasurementRecord（今日）──────────────────────────────────────────
+  await prisma.measurementRecord.upsert({
+    where:  { id: `demo-measure-${dateStr(0)}` },
+    update: {},
+    create: {
+      id:           `demo-measure-${dateStr(0)}`,
+      petId:        pet.id,
+      date:         dateStr(0),
+      weightKg:     3.2,
+      bodyCondition: 'normal',
+      rrr:          20,
+      tempMethod:   'rectal',
+      tempCelsius:  38.5,
     },
   })
-  console.log(`DailyMealPlan: ${mealPlan.id} (${mealPlan.date})`)
+  console.log('  MeasurementRecord: 今日已建立')
 
-  // ── 4. NewsArticle ───────────────────────────────────────────────────────
-  const newsSeeds = [
-    // 食安警報
-    {
-      id: 'news-food-safety-1',
-      category: 'food_safety',
-      subCategory: '食安通報',
-      title: '『某品牌貓罐』含菌量檢驗不合格',
-      summary:
-        '北市抽驗發現某進口品牌含菌量超標，已要求全面下架。請飼主立即停止餵食相同批次產品。',
-      isUrgent: true,
-      sourceName: '食品藥物管理署',
-      publishedAt: new Date('2024-05-15'),
+  // ── 6. MedicationRecord ───────────────────────────────────────────────────
+  await prisma.medicationRecord.upsert({
+    where:  { id: `demo-med-${dateStr(-7)}` },
+    update: {},
+    create: {
+      id:            `demo-med-${dateStr(-7)}`,
+      petId:         pet.id,
+      date:          dateStr(-7),
+      vaccines:      JSON.stringify([]),
+      deworming:     JSON.stringify(['新疥爽（滴劑）']),
+      prescriptions: JSON.stringify([]),
+      clinicVisits:  JSON.stringify([]),
     },
-    {
-      id: 'news-food-safety-2',
-      category: 'food_safety',
-      subCategory: '廠商警告',
-      title: '廠商誠信警告：非法添加物疑雲',
-      summary:
-        '部分代工廠遭踢爆使用非許可等級之防腐劑，相關品牌正進行自主檢驗中。',
-      isUrgent: false,
-      sourceName: '農業部',
-      publishedAt: new Date('2024-05-10'),
+  })
+  console.log('  MedicationRecord: 1 筆')
+
+  // ── 7. GroomingRecord ─────────────────────────────────────────────────────
+  await prisma.groomingRecord.upsert({
+    where:  { id: `demo-groom-${dateStr(-3)}` },
+    update: {},
+    create: {
+      id:    `demo-groom-${dateStr(-3)}`,
+      petId: pet.id,
+      date:  dateStr(-3),
+      mode:  'home',
     },
-    {
-      id: 'news-food-safety-3',
-      category: 'food_safety',
-      subCategory: '食安通報',
-      title: '農業部公告：市售進口飼料黴菌毒素抽驗結果',
-      summary:
-        '本次抽驗共 42 件樣本，3 件黃麴毒素超標，相關業者已接獲通知下架回收。',
-      isUrgent: false,
-      sourceName: '農業部動植物防疫檢疫署',
-      publishedAt: new Date('2024-05-01'),
-    },
-    // 危險禁忌
-    {
-      id: 'news-danger-1',
-      category: 'danger',
-      subCategory: '地雷食物',
-      title: '絕對禁食：巧克力、葡萄、洋蔥',
-      summary:
-        '葡萄與葡萄乾可能導致急性腎衰竭；洋蔥與大蒜會破壞紅血球引起貧血。此外，含有『木糖醇』的無糖口香糖對犬貓具有致命毒性。',
-      isUrgent: false,
-    },
-    {
-      id: 'news-danger-2',
-      category: 'danger',
-      subCategory: '室內植物',
-      title: '貓咪殺手：百合花、萬年青',
-      summary:
-        '百合科植物對貓咪極其危險，即便是吸入花粉也可能導致器官衰竭。常見的黃金葛、虎尾蘭若誤食也會造成口腔紅腫與腸胃不適。',
-      isUrgent: false,
-    },
-    // 健康知識
-    {
-      id: 'news-health-1',
-      category: 'health',
-      subCategory: null,
-      title: '犬貓低溫烘烤糧：最新營養研究',
-      summary:
-        '最新研究顯示，低溫加工技術能有效保留更多蛋白質中的天然酵素與微量營養素。',
-      isUrgent: false,
-      sourceName: '美國獸醫營養學會 (AVMA)',
-      sourceUrl: 'https://www.avma.org',
-    },
-    {
-      id: 'news-health-2',
-      category: 'health',
-      subCategory: null,
-      title: '如何從成分表辨識優質蛋白質來源',
-      summary:
-        '學會看懂『肉類副產品』與『脫水肉粉』的差異，給予毛孩最純粹的食材原型。',
-      isUrgent: false,
-      sourceName: '寵物營養師專欄',
-      sourceUrl: 'https://www.petmd.com',
-    },
+  })
+  console.log('  GroomingRecord: 1 筆')
+
+  // ── 8. Product + ProductUsage（使用中產品）────────────────────────────────
+  const products = [
+    { id: 'demo-prod-1', type: 'feed',       name: '自然本色無穀鮭魚配方', brand: 'Natural Balance' },
+    { id: 'demo-prod-2', type: 'supplement', name: '毛孩時代腸胃益生菌',    brand: '毛孩時代' },
   ]
 
-  for (const article of newsSeeds) {
-    const { id, subCategory, publishedAt, sourceName, sourceUrl, ...rest } = article
-    await prisma.newsArticle.upsert({
-      where: { id },
+  for (const p of products) {
+    await prisma.product.upsert({
+      where:  { id: p.id },
       update: {},
       create: {
-        id,
-        subCategory: subCategory ?? undefined,
-        publishedAt: publishedAt ?? undefined,
-        sourceName: sourceName ?? undefined,
-        sourceUrl: sourceUrl ?? undefined,
-        ...rest,
+        id:    p.id,
+        type:  p.type,
+        name:  p.name,
+        brand: p.brand,
+        ingredientJson: '{}',
       },
     })
+    // PetProduct 沒有複合唯一索引，改用 findFirst + create
+    const existing = await prisma.petProduct.findFirst({
+      where: { petId: pet.id, productId: p.id },
+    })
+    if (!existing) {
+      await prisma.petProduct.create({
+        data: { petId: pet.id, productId: p.id, listType: 'fixed' },
+      })
+    }
   }
-  console.log(`NewsArticle: ${newsSeeds.length} 筆`)
+  console.log(`  Product + PetProduct: ${products.length} 筆`)
 
-  console.log('Seed 完成！')
+  console.log('')
+  console.log('✅ Seed 完成！')
+  console.log(`   Pet ID：${pet.id}`)
+  console.log('   請到「設定頁」選擇「布丁」作為當前寵物，')
+  console.log('   或直接在 localStorage 設定 drpet_currentPetId = "demo-pet-pudding"')
 }
 
 main()
-  .catch((err) => {
-    console.error('Seed 失敗：', err)
-    process.exit(1)
-  })
+  .catch((err) => { console.error('Seed 失敗：', err); process.exit(1) })
   .finally(() => prisma.$disconnect())

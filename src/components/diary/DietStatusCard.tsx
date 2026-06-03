@@ -80,8 +80,8 @@ export default function DietStatusCard({ petId, date, value, onChange }: Props) 
     <div>
       <h3 className="font-bold text-[#2C1810] mb-3">今日飲食狀態</h3>
 
-      {/* Tab pill 列 */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      {/* Segmented control */}
+      <div className="flex bg-slate-100 rounded-full p-1 mb-4">
         {(
           [
             { key: 'all', label: '全部按計畫' },
@@ -94,10 +94,10 @@ export default function DietStatusCard({ petId, date, value, onChange }: Props) 
             <button
               key={tab.key}
               onClick={() => setTab(tab.key)}
-              className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`flex-1 px-3 py-2 rounded-full text-sm font-medium transition-colors text-center ${
                 isActive
-                  ? 'bg-[#C4714A] text-white'
-                  : 'bg-slate-100 text-slate-600'
+                  ? 'bg-[#2C1810] text-white shadow-sm'
+                  : 'text-[#8B7355]'
               }`}
             >
               {tab.label}

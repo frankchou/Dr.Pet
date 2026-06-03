@@ -16,12 +16,58 @@ function IconWave() {
   )
 }
 
-const OPTIONS = [
-  { value: '平靜放鬆', icon: '😊' },
-  { value: '焦躁不安', icon: '⚡' },
-  { value: '攻擊低吼', icon: '🛡' },
-  { value: '異常嚎叫', icon: '🔊' },
-] as const
+// 平靜放鬆：笑臉
+function IconSmile() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M8 13s1.5 3 4 3 4-3 4-3"/>
+      <line x1="9" y1="9" x2="9.01" y2="9"/>
+      <line x1="15" y1="9" x2="15.01" y2="9"/>
+    </svg>
+  )
+}
+
+// 焦躁不安：閃電
+function IconZap() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+  )
+}
+
+// 攻擊低吼：盾牌
+function IconShield() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  )
+}
+
+// 異常嚎叫：喇叭音波
+function IconVolume() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+    </svg>
+  )
+}
+
+interface MoodOption {
+  value: string
+  icon: React.ReactNode
+}
+
+const OPTIONS: MoodOption[] = [
+  { value: '平靜放鬆', icon: <IconSmile /> },
+  { value: '焦躁不安', icon: <IconZap /> },
+  { value: '攻擊低吼', icon: <IconShield /> },
+  { value: '異常嚎叫', icon: <IconVolume /> },
+]
 
 export default function MoodCard({ value, onChange }: Props) {
   function toggle(option: string) {

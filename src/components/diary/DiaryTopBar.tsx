@@ -6,26 +6,12 @@ export interface DiaryTopBarProps {
   onOpenMedication: () => void
   onOpenGrooming: () => void
   onOpenMeasurement: () => void
+  showMedication?: boolean
+  showGrooming?: boolean
+  showMeasurement?: boolean
 }
 
 // ─── Inline SVG icons ─────────────────────────────────────────────────────────
-
-const MicIcon = () => (
-  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" />
-    <line x1="8" y1="23" x2="16" y2="23" />
-  </svg>
-)
-
-const MenuIcon = () => (
-  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <line x1="3" y1="6"  x2="21" y2="6"  />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-)
 
 // 用藥看診 icon（藥丸）
 const PillIcon = () => (
@@ -82,46 +68,21 @@ function ShortcutButton({ icon, label, onClick }: ShortcutButtonProps) {
 
 // ─── DiaryTopBar ──────────────────────────────────────────────────────────────
 
-export default function DiaryTopBar({ onOpenMedication, onOpenGrooming, onOpenMeasurement }: DiaryTopBarProps) {
+export default function DiaryTopBar({
+  onOpenMedication, onOpenGrooming, onOpenMeasurement,
+  showMedication = true, showGrooming = true, showMeasurement = true,
+}: DiaryTopBarProps) {
+  const buttons = [
+    showMedication && <ShortcutButton key="med" icon={<PillIcon />}     label="用藥看診" onClick={onOpenMedication} />,
+    showGrooming   && <ShortcutButton key="grm" icon={<ScissorsIcon />} label="洗澡美容" onClick={onOpenGrooming} />,
+    showMeasurement && <ShortcutButton key="msr" icon={<ScaleIcon />}   label="量測紀錄" onClick={onOpenMeasurement} />,
+  ].filter(Boolean)
+
+  if (buttons.length === 0) return null
+
   return (
-    <div className="space-y-3">
-      {/* 語音輸入列 */}
-      <div className="flex items-center gap-2">
-        {/* 麥克風按鈕（僅 UI，暫不實作語音 API）*/}
-        <button
-          type="button"
-          disabled
-          className="bg-[#111111] text-white w-12 h-12 rounded-full flex items-center justify-center shrink-0 opacity-80 cursor-not-allowed"
-          aria-label="語音輸入（尚未開放）"
-        >
-          <MicIcon />
-        </button>
-
-        {/* 文字輸入框（純 UI 展示）*/}
-        <div className="flex-1 flex items-center bg-slate-100 rounded-2xl px-4 h-12 gap-2">
-          <span className="flex-1 text-sm text-slate-400 select-none">描述寵物的狀況...</span>
-          <MenuIcon />
-        </div>
-      </div>
-
-      {/* 三個快捷按鈕 */}
-      <div className="flex gap-2">
-        <ShortcutButton
-          icon={<PillIcon />}
-          label="用藥看診"
-          onClick={onOpenMedication}
-        />
-        <ShortcutButton
-          icon={<ScissorsIcon />}
-          label="洗澡美容"
-          onClick={onOpenGrooming}
-        />
-        <ShortcutButton
-          icon={<ScaleIcon />}
-          label="量測紀錄"
-          onClick={onOpenMeasurement}
-        />
-      </div>
+    <div className="flex gap-2">
+      {buttons}
     </div>
   )
 }

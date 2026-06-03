@@ -61,7 +61,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const fade = scrolled
     ? 'opacity-0 -translate-y-3 pointer-events-none'
     : 'opacity-100 translate-y-0 pointer-events-auto'
-  const hideChrome = pathname === '/nutritionist'
+  const isChat = pathname === '/nutritionist'
 
   return (
     <div
@@ -78,39 +78,43 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <main
           ref={scrollRef}
           id="main-scroll-container"
-          className="flex-1 overflow-y-auto pb-28 md:pb-10 hide-scrollbar relative"
+          className={isChat
+            ? 'flex-1 overflow-hidden relative'
+            : 'flex-1 overflow-y-auto pb-28 md:pb-10 hide-scrollbar relative'}
         >
-          {/* Sticky transparent header */}
-          <header className="px-6 md:px-10 pt-12 md:pt-10 pb-4 flex items-center justify-between z-30 sticky top-0 bg-transparent pointer-events-none">
+          {/* Sticky transparent header — hidden on chat page */}
+          {!isChat && (
+            <header className="px-6 md:px-10 pt-12 md:pt-10 pb-4 flex items-center justify-between z-30 sticky top-0 bg-transparent pointer-events-none">
 
-            {/* Mobile: user avatar */}
-            <div className={`relative flex items-center gap-3 md:hidden transition-all duration-300 ${fade} ${hideChrome ? 'invisible' : ''}`}>
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center shadow-sm border border-white/50 pointer-events-auto cursor-pointer">
-                {avatarUrl
-                  ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  : <span className="text-sm font-bold text-[#D98A53]">{displayName.charAt(0)}</span>
-                }
+              {/* Mobile: user avatar */}
+              <div className={`relative flex items-center gap-3 md:hidden transition-all duration-300 ${fade}`}>
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center shadow-sm border border-white/50 pointer-events-auto cursor-pointer">
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    : <span className="text-sm font-bold text-[#D98A53]">{displayName.charAt(0)}</span>
+                  }
+                </div>
               </div>
-            </div>
 
-            {/* Desktop: page title + subtitle */}
-            <div className={`hidden md:block transition-all duration-300 ${fade}`}>
-              {title && <h2 className="text-2xl font-bold tracking-tight">{title}</h2>}
-              {subtitle && <p className="text-sm text-slate-500 font-medium mt-1">{subtitle}</p>}
-            </div>
+              {/* Desktop: page title + subtitle */}
+              <div className={`hidden md:block transition-all duration-300 ${fade}`}>
+                {title && <h2 className="text-2xl font-bold tracking-tight">{title}</h2>}
+                {subtitle && <p className="text-sm text-slate-500 font-medium mt-1">{subtitle}</p>}
+              </div>
 
-            {/* Bell icon */}
-            {!hideChrome && (
+              {/* Bell icon */}
               <button
                 className={`w-10 h-10 rounded-full border border-white/40 bg-white/30 backdrop-blur-md flex items-center justify-center hover:bg-white/60 transition-all duration-300 shadow-sm ml-auto pointer-events-auto ${fade}`}
               >
                 <BellIcon />
               </button>
-            )}
-          </header>
+            </header>
+          )}
 
-          {/* Desktop: white rounded card wrapper */}
-          <div className="max-w-6xl mx-auto w-full min-h-full flex flex-col md:bg-white md:rounded-[40px] md:shadow-sm md:border md:border-slate-100 md:mt-2 md:mb-6 md:p-6">
+          {/* Content wrapper — h-full with card for chat, min-h-full with margins for others */}
+          <div className={isChat
+            ? 'h-full flex flex-col md:bg-white md:rounded-[40px] md:shadow-sm md:border md:border-slate-100 md:p-6'
+            : 'max-w-6xl mx-auto w-full min-h-full flex flex-col md:bg-white md:rounded-[40px] md:shadow-sm md:border md:border-slate-100 md:mt-2 md:mb-6 md:p-6'}>
             {children}
           </div>
         </main>

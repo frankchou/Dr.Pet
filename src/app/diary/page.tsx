@@ -10,21 +10,9 @@ import DiaryTopBar from '@/components/diary/DiaryTopBar'
 import MedicationModal from '@/components/diary/MedicationModal'
 import GroomingModal from '@/components/diary/GroomingModal'
 import MeasurementModal from '@/components/diary/MeasurementModal'
-import DailyChecklist from '@/components/diary/DailyChecklist'
-import DietStatusCard from '@/components/diary/DietStatusCard'
-import AppetiteCard from '@/components/diary/AppetiteCard'
-import WaterCard from '@/components/diary/WaterCard'
-import StoolCard from '@/components/diary/StoolCard'
-import UrineCard from '@/components/diary/UrineCard'
-import VitalityCard from '@/components/diary/VitalityCard'
-import MoodCard from '@/components/diary/MoodCard'
-import SkinHairCard from '@/components/diary/SkinHairCard'
-import EyeEarCard from '@/components/diary/EyeEarCard'
-import DentalCard from '@/components/diary/DentalCard'
-import DigestionCard from '@/components/diary/DigestionCard'
-import RespiratoryCard from '@/components/diary/RespiratoryCard'
-import NeuroCard from '@/components/diary/NeuroCard'
-import ReproductiveCard from '@/components/diary/ReproductiveCard'
+import HealthLogSection from '@/components/diary/HealthLogSection'
+import MonthHealthOverview from '@/components/diary/MonthHealthOverview'
+import { useRecordParams } from '@/hooks/useRecordParams'
 
 // ─── 月曆 helper ─────────────────────────────────────────────────────────────
 
@@ -80,37 +68,6 @@ interface PetInfo {
   sex: string
 }
 
-// DietStatusCard の DietValue 型
-interface DietValue {
-  tab: 'all' | 'reduced' | 'forbidden'
-  mealStatuses: Record<string, string>
-}
-
-// DailyHealthLog の全欄位（對應 API 回傳）
-interface DailyHealthLogData {
-  appetite: string | null
-  waterMl: number | null
-  waterStatus: string | null
-  stoolType: string | null
-  stoolDetails: string
-  urineStatus: string | null
-  vitality: string | null
-  mood: string
-  skinHair: string
-  skinHairPhotos: string
-  eyeEar: string
-  eyeEarPhotos: string
-  dental: string
-  dentalPhotos: string
-  digestion: string
-  digestionPhotos: string
-  respiratory: string
-  neuro: string
-  reproductive: string
-  dailyChecklist: string
-  dietStatusTab: string | null
-  mealStatuses: string
-}
 
 // ─── 常數 ────────────────────────────────────────────────────────────────────
 
@@ -390,11 +347,17 @@ function DayDetail({ petId, date, onClose }: { petId: string; date: string; onCl
 
 // ─── Month calendar ───────────────────────────────────────────────────────────
 
-function MonthCalendar({ recordedDates, petId }: { recordedDates: Set<string>; petId: string }) {
+function MonthCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: Set<string>; petId: string; onDateSelect?: (date: string | null) => void }) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  function selectDate(key: string) {
+    const next = selectedDate === key ? null : key
+    setSelectedDate(next)
+    onDateSelect?.(next)
+  }
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfMonth(year, month)
@@ -428,7 +391,7 @@ function MonthCalendar({ recordedDates, petId }: { recordedDates: Set<string>; p
             const hasRec = recordedDates.has(key)
             const isSelected = key === selectedDate
             return (
-              <div key={day} onClick={() => setSelectedDate(prev => prev === key ? null : key)} className="flex flex-col items-center justify-start h-12 relative cursor-pointer group">
+              <div key={day} onClick={() => selectDate(key)} className="flex flex-col items-center justify-start h-12 relative cursor-pointer group">
                 <div className={cn('w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold transition-all',
                   isSelected ? 'bg-[#D98A53] text-white shadow-md' : isToday ? 'bg-[#111111] text-white shadow-md' : 'text-slate-700 group-hover:bg-slate-100'
                 )}>{day}</div>
@@ -1222,35 +1185,6 @@ function ProductLists({ petId, onAddNewProduct }: ProductListsProps) {
   )
 }
 
-// ─── DailyHealthLog 預設值 ────────────────────────────────────────────────────
-
-function defaultHealthLog(): DailyHealthLogData {
-  return {
-    appetite: null,
-    waterMl: null,
-    waterStatus: null,
-    stoolType: null,
-    stoolDetails: '[]',
-    urineStatus: null,
-    vitality: null,
-    mood: '[]',
-    skinHair: '[]',
-    skinHairPhotos: '[]',
-    eyeEar: '[]',
-    eyeEarPhotos: '[]',
-    dental: '[]',
-    dentalPhotos: '[]',
-    digestion: '[]',
-    digestionPhotos: '[]',
-    respiratory: '[]',
-    neuro: '[]',
-    reproductive: '[]',
-    dailyChecklist: '[]',
-    dietStatusTab: null,
-    mealStatuses: '{}',
-  }
-}
-
 // ─── 主頁面 ────────────────────────────────────────────────────────────────────
 
 export default function DiaryPage() {
@@ -1258,6 +1192,8 @@ export default function DiaryPage() {
   const today = new Date().toISOString().split('T')[0]
 
   // ─ 基礎 state ──────────────────────────────────────────────────────────────
+  const { params: recordParams, isEnabled } = useRecordParams()
+
   const [petId, setPetId]               = useState('')
   const [petSex, setPetSex]             = useState<string>('unknown')
   const [selectedDate, setSelectedDate] = useState(today)
@@ -1267,22 +1203,11 @@ export default function DiaryPage() {
 
   // ─ Modal 開關 ──────────────────────────────────────────────────────────────
   const [calTab, setCalTab] = useState<'month' | 'week'>('month')
+  const [monthSelectedDate, setMonthSelectedDate] = useState(today)
 
   const [showMedModal, setShowMedModal]     = useState(false)
   const [showGroomModal, setShowGroomModal] = useState(false)
   const [showMeasModal, setShowMeasModal]   = useState(false)
-
-  // ─ 每日健康紀錄 state（對應 DailyHealthLog 欄位）──────────────────────────
-  const [healthLog, setHealthLog] = useState<DailyHealthLogData>(defaultHealthLog)
-
-  // DietStatusCard 用的複合值（tab + mealStatuses）
-  const dietValue: DietValue = {
-    tab: (healthLog.dietStatusTab as DietValue['tab']) ?? 'all',
-    mealStatuses: parseJson<Record<string, string>>(healthLog.mealStatuses, {}),
-  }
-
-  // ─ Debounce 儲存 ref ────────────────────────────────────────────────────────
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 頁面 ref 供 deep-link scroll
   const dietRef = useRef<HTMLDivElement>(null)
@@ -1329,38 +1254,6 @@ export default function DiaryPage() {
       .catch(() => {})
   }, [petId])
 
-  // ─── 載入當日健康紀錄 ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!petId) return
-    fetch(`/api/daily-health-log?petId=${petId}&date=${selectedDate}`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: DailyHealthLogData | null) => {
-        setHealthLog(data ?? defaultHealthLog())
-      })
-      .catch(() => setHealthLog(defaultHealthLog()))
-  }, [petId, selectedDate])
-
-  // ─── Debounce 自動儲存（1000ms）────────────────────────────────────────────
-  const scheduleSave = useCallback((patch: Partial<DailyHealthLogData>) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(async () => {
-      if (!petId) return
-      try {
-        await fetch('/api/daily-health-log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ petId, date: selectedDate, ...patch }),
-        })
-      } catch { /* 靜默 */ }
-    }, 1000)
-  }, [petId, selectedDate])
-
-  // ─── 更新單一欄位並排程儲存 ───────────────────────────────────────────────
-  function patchLog(patch: Partial<DailyHealthLogData>) {
-    setHealthLog(prev => ({ ...prev, ...patch }))
-    scheduleSave(patch)
-  }
-
   // ─── 換食計畫同步 localStorage ────────────────────────────────────────────
   const handleSetHasPlan = (v: boolean) => {
     setHasPlan(v)
@@ -1404,182 +1297,55 @@ export default function DiaryPage() {
         <button onClick={() => setCalTab('month')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
         <button onClick={() => setCalTab('week')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
       </div>
-      {calTab === 'month'
-        ? <MonthCalendar recordedDates={recordedDates} petId={petId} />
-        : <WeekCalendar recordedDates={recordedDates} petId={petId} />
-      }
-
-      {/* ─── DiaryTopBar ──────────────────────────────────────────────── */}
-      <DiaryTopBar
-        onOpenMedication={() => setShowMedModal(true)}
-        onOpenGrooming={() => setShowGroomModal(true)}
-        onOpenMeasurement={() => setShowMeasModal(true)}
-      />
-
-      {/* ─── 當日健康紀錄分隔標題 ─────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-xs font-bold text-slate-400 shrink-0">
-          {selectedDate === today ? '今日' : selectedDate.slice(5).replace('-', '/')} 健康紀錄
-        </span>
-        <div className="flex-1 h-px bg-slate-200" />
-      </div>
-
-      {/* ─── DailyChecklist ───────────────────────────────────────────── */}
-      <DailyChecklist
-        value={parseJson<string[]>(healthLog.dailyChecklist, [])}
-        onChange={(val) => patchLog({ dailyChecklist: JSON.stringify(val) })}
-      />
-
-      {/* ─── DietStatusCard ───────────────────────────────────────────── */}
-      <DietStatusCard
-        petId={petId}
-        date={selectedDate}
-        value={dietValue}
-        onChange={(val) => patchLog({
-          dietStatusTab: val.tab,
-          mealStatuses: JSON.stringify(val.mealStatuses),
-        })}
-      />
-
-      {/* ─── AppetiteCard ─────────────────────────────────────────────── */}
-      <AppetiteCard
-        value={healthLog.appetite}
-        onChange={(val) => patchLog({ appetite: val })}
-      />
-
-      {/* ─── WaterCard ────────────────────────────────────────────────── */}
-      <WaterCard
-        value={
-          healthLog.waterMl != null || healthLog.waterStatus != null
-            ? JSON.stringify({ ml: healthLog.waterMl, status: healthLog.waterStatus })
-            : null
-        }
-        onChange={(val) => {
-          try {
-            const parsed = JSON.parse(val) as { ml: number | null; status: string | null }
-            patchLog({ waterMl: parsed.ml, waterStatus: parsed.status })
-          } catch { /* 靜默 */ }
-        }}
-      />
-
-      {/* ─── StoolCard ────────────────────────────────────────────────── */}
-      <StoolCard
-        value={
-          healthLog.stoolType != null || healthLog.stoolDetails !== '[]'
-            ? JSON.stringify({ stoolType: healthLog.stoolType, stoolDetails: parseJson<string[]>(healthLog.stoolDetails, []) })
-            : null
-        }
-        onChange={(val) => {
-          try {
-            const parsed = JSON.parse(val) as { stoolType: string | null; stoolDetails: string[] }
-            patchLog({
-              stoolType: parsed.stoolType,
-              stoolDetails: JSON.stringify(parsed.stoolDetails),
-            })
-          } catch { /* 靜默 */ }
-        }}
-      />
-
-      {/* ─── UrineCard ────────────────────────────────────────────────── */}
-      <UrineCard
-        value={healthLog.urineStatus}
-        onChange={(val) => patchLog({ urineStatus: val })}
-        onSubmitDay={() => { /* 確認動畫由 UrineCard 內部處理 */ }}
-      />
-
-      {/* ─── VitalityCard ─────────────────────────────────────────────── */}
-      <VitalityCard
-        value={healthLog.vitality}
-        onChange={(val) => patchLog({ vitality: val })}
-      />
-
-      {/* ─── MoodCard ─────────────────────────────────────────────────── */}
-      <MoodCard
-        value={parseJson<string[]>(healthLog.mood, [])}
-        onChange={(val) => patchLog({ mood: JSON.stringify(val) })}
-      />
-
-      {/* ─── SkinHairCard ─────────────────────────────────────────────── */}
-      <SkinHairCard
-        value={parseJson<string[]>(healthLog.skinHair, [])}
-        onChange={(val) => patchLog({ skinHair: JSON.stringify(val) })}
-        photos={parseJson<string[]>(healthLog.skinHairPhotos, [])}
-        onPhotosChange={(urls) => patchLog({ skinHairPhotos: JSON.stringify(urls) })}
-      />
-
-      {/* ─── EyeEarCard ───────────────────────────────────────────────── */}
-      <EyeEarCard
-        value={parseJson<string[]>(healthLog.eyeEar, [])}
-        onChange={(val) => patchLog({ eyeEar: JSON.stringify(val) })}
-        photos={parseJson<string[]>(healthLog.eyeEarPhotos, [])}
-        onPhotosChange={(urls) => patchLog({ eyeEarPhotos: JSON.stringify(urls) })}
-      />
-
-      {/* ─── DentalCard ───────────────────────────────────────────────── */}
-      <DentalCard
-        value={parseJson<string[]>(healthLog.dental, [])}
-        onChange={(val) => patchLog({ dental: JSON.stringify(val) })}
-        photos={parseJson<string[]>(healthLog.dentalPhotos, [])}
-        onPhotosChange={(urls) => patchLog({ dentalPhotos: JSON.stringify(urls) })}
-      />
-
-      {/* ─── DigestionCard ────────────────────────────────────────────── */}
-      <DigestionCard
-        value={parseJson<string[]>(healthLog.digestion, [])}
-        onChange={(val) => patchLog({ digestion: JSON.stringify(val) })}
-        photos={parseJson<string[]>(healthLog.digestionPhotos, [])}
-        onPhotosChange={(urls) => patchLog({ digestionPhotos: JSON.stringify(urls) })}
-      />
-
-      {/* ─── RespiratoryCard ──────────────────────────────────────────── */}
-      <RespiratoryCard
-        value={parseJson<string[]>(healthLog.respiratory, [])}
-        onChange={(val) => patchLog({ respiratory: JSON.stringify(val) })}
-      />
-
-      {/* ─── NeuroCard ────────────────────────────────────────────────── */}
-      <NeuroCard
-        value={parseJson<string[]>(healthLog.neuro, [])}
-        onChange={(val) => patchLog({ neuro: JSON.stringify(val) })}
-      />
-
-      {/* ─── ReproductiveCard ─────────────────────────────────────────── */}
-      <ReproductiveCard
-        value={parseJson<string[]>(healthLog.reproductive, [])}
-        onChange={(val) => patchLog({ reproductive: JSON.stringify(val) })}
-        sex={petSex}
-      />
-
-      {/* ─── 分隔標題：保留功能 ───────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-xs font-bold text-slate-400 shrink-0">AI 隨記 / 飲食 / 換食計畫</span>
-        <div className="flex-1 h-px bg-slate-200" />
-      </div>
-
-      {/* ─── AiMemo ───────────────────────────────────────────────────── */}
-      <AiMemo petId={petId} />
-
-      {/* ─── DietRecord ───────────────────────────────────────────────── */}
-      <DietRecord
-        petId={petId}
-        dietRef={dietRef}
-        hasPlan={hasPlan}
-        setHasPlan={handleSetHasPlan}
-      />
-
-      {/* ─── ProductLists ─────────────────────────────────────────────── */}
-      <ProductLists petId={petId} onAddNewProduct={scrollToDiet} />
-
-      {/* ─── 換食計畫進行中 ───────────────────────────────────────────── */}
-      {hasPlan && planStart && (
-        <DietPlanActive
-          petId={petId}
-          startDate={planStart}
-          onEnd={() => handleSetHasPlan(false)}
-        />
+      {calTab === 'month' ? (
+        <>
+          {/* ─── 月曆模式：月曆 + 唯讀總覽 ─────────────────────────────── */}
+          <MonthCalendar
+            recordedDates={recordedDates}
+            petId={petId}
+            onDateSelect={(d) => setMonthSelectedDate(d ?? today)}
+          />
+          <MonthHealthOverview
+            petId={petId}
+            date={monthSelectedDate}
+            recordedDates={recordedDates}
+          />
+        </>
+      ) : (
+        <>
+          {/* ─── 週曆模式：週曆 + 記錄快捷 + 健康紀錄編輯區 ─────────── */}
+          <WeekCalendar recordedDates={recordedDates} petId={petId} />
+          <DiaryTopBar
+            onOpenMedication={() => setShowMedModal(true)}
+            onOpenGrooming={() => setShowGroomModal(true)}
+            onOpenMeasurement={() => setShowMeasModal(true)}
+            showMedication={isEnabled('medication')}
+            showGrooming={isEnabled('grooming')}
+            showMeasurement={isEnabled('measurement')}
+          />
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-xs font-bold text-slate-400 shrink-0">
+              {selectedDate === today ? '今日' : selectedDate.slice(5).replace('-', '/')} 健康紀錄
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+          <HealthLogSection petId={petId} date={selectedDate} petSex={petSex} params={recordParams} />
+        </>
       )}
+
+      {/* 日常飲食紀錄、使用中產品、換食計畫分隔線 — 暫時隱藏，功能移至飲食頁
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs font-bold text-slate-400 shrink-0">飲食 / 換食計畫</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+      <DietRecord petId={petId} dietRef={dietRef} hasPlan={hasPlan} setHasPlan={handleSetHasPlan} />
+      <ProductLists petId={petId} onAddNewProduct={scrollToDiet} />
+      {hasPlan && planStart && (
+        <DietPlanActive petId={petId} startDate={planStart} onEnd={() => handleSetHasPlan(false)} />
+      )}
+      */}
 
       {/* ─── Modals ───────────────────────────────────────────────────── */}
       {showMedModal && (

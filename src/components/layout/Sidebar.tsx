@@ -127,7 +127,7 @@ export default function Sidebar() {
 
   const isActive = (href: string): boolean => {
     if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
+    return pathname === href || pathname.startsWith(href + '/')
   }
 
   const itemClass = (href: string): string =>

@@ -113,7 +113,7 @@ export default function ChatPage() {
         <div className="px-4 pt-10 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
-            <h1 className="text-lg font-bold text-[#2C1810]">AI 營養師</h1>
+            <h1 className="text-lg font-bold text-[#2C1810]">AI 諮詢</h1>
           </div>
           {messages.length > 0 && (
             <button onClick={handleClearHistory} className="text-xs text-gray-400 hover:text-red-500 transition-colors">

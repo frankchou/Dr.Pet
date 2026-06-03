@@ -480,6 +480,44 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
+
+              {/* 活力指數 */}
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <IconChip bgColor="#FEF1E2" icon={
+                  <SvgZap size={24} />
+                } />
+                <div>
+                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">活力指數</h3>
+                  {loading ? (
+                    <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+                  ) : healthMetric?.vitality ? (
+                    <HealthTag accent>
+                      {healthMetric.vitality === 'high' ? '活躍' : healthMetric.vitality === 'medium' ? '正常' : '低落'}
+                    </HealthTag>
+                  ) : (
+                    <span className="text-slate-400 text-sm">尚未記錄</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 水分攝取 */}
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <IconChip bgColor="#EDF3FB" icon={
+                  <SvgDroplets size={24} />
+                } />
+                <div>
+                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">水分攝取</h3>
+                  {loading ? (
+                    <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+                  ) : healthMetric?.waterIntake ? (
+                    <HealthTag accent>
+                      {healthMetric.waterIntake === 'high' ? '偏多' : healthMetric.waterIntake === 'medium' ? '正常' : '偏少'}
+                    </HealthTag>
+                  ) : (
+                    <span className="text-slate-400 text-sm">尚未記錄</span>
+                  )}
+                </div>
+              </div>
             </div>
 
           </div>
@@ -548,7 +586,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* 5. 健康指標 */}
+            {/* 健康指標 — 活力/水分已移至健康檔案概覽，此區塊暫時隱藏
             <div className="flex items-center gap-2 mt-10 mb-4">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
                 <SvgHeartPulse />
@@ -556,19 +594,14 @@ export default function HomePage() {
               <h2 className="text-xl font-bold tracking-tight text-slate-900">健康指標</h2>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <HealthMetric
-                icon={<SvgHeart size={18} />} bg="#FDE2EC" label="體態評分"
-                value={healthMetric?.bodyScore ? `${healthMetric.bodyScore}/9` : null}
-              />
-              <HealthMetric
-                icon={<SvgZap size={18} />} bg="#FEF1E2" label="活力指數"
-                value={healthMetric?.vitality === 'low' ? '低落' : healthMetric?.vitality === 'medium' ? '正常' : healthMetric?.vitality === 'high' ? '活躍' : null}
-              />
-              <HealthMetric
-                icon={<SvgDroplets size={18} />} bg="#EDF3FB" label="水分攝取"
-                value={healthMetric?.waterIntake === 'low' ? '偏少' : healthMetric?.waterIntake === 'medium' ? '正常' : healthMetric?.waterIntake === 'high' ? '偏多' : null}
-              />
+              <HealthMetric icon={<SvgHeart size={18} />} bg="#FDE2EC" label="體態評分"
+                value={healthMetric?.bodyScore ? `${healthMetric.bodyScore}/9` : null} />
+              <HealthMetric icon={<SvgZap size={18} />} bg="#FEF1E2" label="活力指數"
+                value={healthMetric?.vitality === 'low' ? '低落' : healthMetric?.vitality === 'medium' ? '正常' : healthMetric?.vitality === 'high' ? '活躍' : null} />
+              <HealthMetric icon={<SvgDroplets size={18} />} bg="#EDF3FB" label="水分攝取"
+                value={healthMetric?.waterIntake === 'low' ? '偏少' : healthMetric?.waterIntake === 'medium' ? '正常' : healthMetric?.waterIntake === 'high' ? '偏多' : null} />
             </div>
+            */}
 
           </div>
 
@@ -603,7 +636,7 @@ export default function HomePage() {
 
             {/* 飲食紀錄按鈕 */}
             <Link
-              href="/diary#diet-record"
+              href="/diet"
               className="w-full text-left bg-[#111111] rounded-[32px] p-5 flex items-center justify-between group hover:bg-black transition-colors shadow-lg shadow-black/10"
             >
               <div className="flex items-center gap-4">

@@ -27,17 +27,6 @@ function PurePawLogo({ width = 28, height = 28 }: { width?: number; height?: num
 
 /* ── SVG 圖示 ────────────────────────────────────── */
 
-function IconStethoscope({ size = 24 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-      strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
-      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-      <circle cx="20" cy="10" r="2" />
-    </svg>
-  )
-}
-
 function IconInfo({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
@@ -178,57 +167,61 @@ export default function NutritionistPage() {
   }
 
   return (
-    <div className="px-6 md:px-8 py-6 min-h-full flex flex-col animate-in fade-in slide-in-from-right-8 duration-500">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#E2F3E4] flex items-center justify-center text-[#2D6A4F] shrink-0">
-          <IconStethoscope size={24} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">AI 營養師</h1>
-          <p className="text-sm text-slate-500 font-medium">與毛孩專屬營養師對話</p>
-        </div>
-      </div>
+    <div className="h-full flex flex-col overflow-hidden bg-white">
 
-      {/* 免責聲明 */}
-      <div className="bg-[#FEF1E2] border border-[#F3D9BE] rounded-2xl px-4 py-3 mb-6 flex items-center gap-2">
-        <span className="text-[#D98A53] shrink-0">
-          <IconInfo size={16} />
-        </span>
-        <p className="text-xs font-bold text-[#9A6233]">本功能提供資訊整理與觀察建議，不能替代獸醫診斷。</p>
-      </div>
+      {/* ── 頂部：標題 + 免責聲明 + 寵物切換（置頂）──────── */}
+      <div className="shrink-0 px-6 md:px-8 pt-5 pb-3 border-b border-slate-100 bg-white">
 
-      {/* 寵物切換 pills */}
-      {pets.length > 0 && (
-        <div className="flex gap-2 mb-6 overflow-x-auto hide-scrollbar">
-          {pets.map(pet => (
-            <button
-              key={pet.id}
-              onClick={() => handlePetChange(pet.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-colors shrink-0 ${
-                activePetId === pet.id
-                  ? 'bg-[#111111] text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  activePetId === pet.id ? 'bg-white/20' : 'bg-[#D98A53] text-white'
+        {/* 標題列 */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#E2F3E4] flex items-center justify-center text-[#2D6A4F] shrink-0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+              <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+              <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+              <circle cx="20" cy="10" r="2" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">AI 諮詢</h1>
+            <p className="text-xs text-slate-500 font-medium">與 AI 討論毛孩的健康問題</p>
+          </div>
+        </div>
+
+        <div className="bg-[#FEF1E2] border border-[#F3D9BE] rounded-xl px-3 py-2 flex items-center gap-2 mb-3">
+          <span className="text-[#D98A53] shrink-0"><IconInfo size={14} /></span>
+          <p className="text-xs font-bold text-[#9A6233]">本功能提供資訊整理與觀察建議，不能替代獸醫診斷。</p>
+        </div>
+
+        {pets.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+            {pets.map(pet => (
+              <button
+                key={pet.id}
+                onClick={() => handlePetChange(pet.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold transition-colors shrink-0 ${
+                  activePetId === pet.id
+                    ? 'bg-[#111111] text-white shadow-sm'
+                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                {pet.name.charAt(0)}
-              </span>
-              {pet.name}
-            </button>
-          ))}
-        </div>
-      )}
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  activePetId === pet.id ? 'bg-white/20' : 'bg-[#D98A53] text-white'
+                }`}>
+                  {pet.name.charAt(0)}
+                </span>
+                {pet.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* 對話區 */}
-      <div className="flex-1 flex flex-col gap-3 mb-4 min-h-[280px]">
-        {/* 空狀態 */}
+      {/* ── 中間：對話訊息區（唯一可 scroll 區域）────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 md:px-8 py-4 flex flex-col gap-3 bg-white">
+
+        {/* 空白狀態 */}
         {empty && (
-          <div className="flex flex-col items-center text-center py-6">
+          <div className="flex flex-col items-center text-center py-8">
             <PurePawLogo width={56} height={56} />
             <p className="font-bold text-slate-900 mt-4">
               {petName ? `和 AI 討論 ${petName} 的健康` : '和 AI 討論毛孩的健康'}
@@ -248,7 +241,7 @@ export default function NutritionistPage() {
           </div>
         )}
 
-        {/* 訊息泡泡 */}
+        {/* 歷史訊息 */}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.role === 'assistant' && (
@@ -256,32 +249,25 @@ export default function NutritionistPage() {
                 <PurePawLogo width={28} height={28} />
               </div>
             )}
-            <div
-              className={`max-w-[80%] px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed font-medium ${
-                m.role === 'user'
-                  ? 'bg-[#111111] text-white rounded-3xl rounded-tr-md'
-                  : 'bg-white text-slate-800 shadow-sm border border-slate-100 rounded-3xl rounded-tl-md'
-              }`}
-            >
+            <div className={`max-w-[80%] px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed font-medium ${
+              m.role === 'user'
+                ? 'bg-[#111111] text-white rounded-3xl rounded-tr-md'
+                : 'bg-white text-slate-800 shadow-sm border border-slate-100 rounded-3xl rounded-tl-md'
+            }`}>
               {m.content}
             </div>
           </div>
         ))}
 
-        {/* 載入中動畫 */}
+        {/* 打字中 */}
         {loading && (
           <div className="flex justify-start">
-            <div className="mr-2 shrink-0">
-              <PurePawLogo width={28} height={28} />
-            </div>
+            <div className="mr-2 shrink-0"><PurePawLogo width={28} height={28} /></div>
             <div className="bg-white rounded-3xl rounded-tl-md px-4 py-3 shadow-sm border border-slate-100">
               <div className="flex gap-1">
                 {[0, 1, 2].map(i => (
-                  <div
-                    key={i}
-                    className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
+                  <div key={i} className="w-2 h-2 bg-slate-300 rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
             </div>
@@ -291,20 +277,17 @@ export default function NutritionistPage() {
         <div ref={endRef} />
       </div>
 
-      {/* 底部輸入列 */}
-      <div className="mt-auto bg-white -mx-6 md:-mx-8 px-6 md:px-8 pt-3 pb-3 border-t border-slate-100">
-        {/* 生成觀察計畫按鈕（空狀態時顯示）*/}
+      {/* ── 底部：輸入列（置底）──────────────────────────── */}
+      <div className="shrink-0 bg-white border-t border-slate-100 px-6 md:px-8 pt-3 pb-28 md:pb-4">
         {empty && (
           <button
             onClick={() => send(`請根據${petName}的狀況，幫我生成本週的健康觀察計畫，並給出改善建議。`)}
-            className="w-full mb-2 flex items-center justify-center gap-2 bg-[#FEF1E2] text-[#D98A53] rounded-full py-3 text-sm font-bold hover:bg-[#FCE7D2] transition-colors"
+            className="w-full mb-2 flex items-center justify-center gap-2 bg-[#FEF1E2] text-[#D98A53] rounded-full py-2.5 text-sm font-bold hover:bg-[#FCE7D2] transition-colors"
           >
-            <IconSparkles size={16} />
+            <IconSparkles size={15} />
             生成本週觀察計畫
           </button>
         )}
-
-        {/* 輸入框 */}
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full p-1.5 shadow-sm">
           <input
             value={input}
@@ -313,19 +296,15 @@ export default function NutritionistPage() {
             placeholder={petName ? `詢問關於 ${petName} 的問題...` : '詢問關於毛孩的問題...'}
             className="flex-1 bg-transparent px-4 py-2 text-sm font-medium outline-none placeholder:text-slate-400"
           />
-          <button
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-black transition-colors"
-            aria-label="語音輸入（裝飾）"
-            type="button"
-          >
+          <button className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-black transition-colors"
+            aria-label="語音輸入" type="button">
             <IconMic size={18} />
           </button>
           <button
             onClick={() => send(input)}
             disabled={!input.trim() || loading}
             className="w-10 h-10 rounded-full bg-[#111111] text-white flex items-center justify-center disabled:opacity-30 hover:bg-black transition-colors shrink-0"
-            type="button"
-            aria-label="送出訊息"
+            type="button" aria-label="送出訊息"
           >
             <IconSend size={18} />
           </button>

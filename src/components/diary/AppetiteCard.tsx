@@ -16,13 +16,73 @@ function IconSteak() {
   )
 }
 
-const OPTIONS = [
-  { value: '胃口極佳', icon: '⚡', iconColor: 'text-orange-500' },
-  { value: '食慾正常', icon: '😊', iconColor: 'text-green-500' },
-  { value: '猶豫慢食', icon: '😐', iconColor: 'text-yellow-500' },
-  { value: '挑食偏食', icon: '😟', iconColor: 'text-blue-500' },
-  { value: '完全拒食', icon: '⊙', iconColor: 'text-red-500' },
-] as const
+// 胃口極佳：閃電
+function IconZap() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+  )
+}
+
+// 食慾正常：笑臉圓圈
+function IconSmileHappy() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M8 13s1.5 3 4 3 4-3 4-3"/>
+      <line x1="9" y1="9" x2="9.01" y2="9"/>
+      <line x1="15" y1="9" x2="15.01" y2="9"/>
+    </svg>
+  )
+}
+
+// 猶豫慢食：中性臉
+function IconSmileNeutral() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="8" y1="13" x2="16" y2="13"/>
+      <line x1="9" y1="9" x2="9.01" y2="9"/>
+      <line x1="15" y1="9" x2="15.01" y2="9"/>
+    </svg>
+  )
+}
+
+// 挑食偏食：皺眉臉
+function IconSmileSad() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M16 16s-1.5-3-4-3-4 3-4 3"/>
+      <line x1="9" y1="9" x2="9.01" y2="9"/>
+      <line x1="15" y1="9" x2="15.01" y2="9"/>
+    </svg>
+  )
+}
+
+// 完全拒食：禁止圓圈
+function IconBan() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+    </svg>
+  )
+}
+
+interface AppetiteOption {
+  value: string
+  icon: React.ReactNode
+}
+
+const OPTIONS: AppetiteOption[] = [
+  { value: '胃口極佳', icon: <IconZap /> },
+  { value: '食慾正常', icon: <IconSmileHappy /> },
+  { value: '猶豫慢食', icon: <IconSmileNeutral /> },
+  { value: '挑食偏食', icon: <IconSmileSad /> },
+  { value: '完全拒食', icon: <IconBan /> },
+]
 
 export default function AppetiteCard({ value, onChange }: Props) {
   return (
@@ -44,7 +104,7 @@ export default function AppetiteCard({ value, onChange }: Props) {
                   : 'bg-white border border-slate-200 text-slate-600'
               }`}
             >
-              <span className={isSelected ? '' : opt.iconColor}>{opt.icon}</span>
+              {opt.icon}
               {opt.value}
             </button>
           )

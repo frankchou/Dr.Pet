@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn, parseJson, formatDate } from '@/lib/utils'
 import type { DietAnalysisResult } from '@/app/api/diet-analysis/route'
+import DietSwitchPlan from '@/components/diary/DietSwitchPlan'
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -1226,7 +1227,7 @@ export default function DietPage() {
 
       <div className="flex-1">
         {activeTab === 'switch' ? (
-          <SwitchPlanComingSoon />
+          <DietSwitchPlan petId={petId ?? ''} />
         ) : (
           <>
             {/* 當日日期 */}
