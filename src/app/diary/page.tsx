@@ -6,7 +6,7 @@ import { cn, parseJson, productTypeLabel } from '@/lib/utils'
 
 // ─── 新版日誌元件 ──────────────────────────────────────────────────────────────
 import DiaryTopBar from '@/components/diary/DiaryTopBar'
-import DiaryCalendar from '@/components/diary/DiaryCalendar'
+// DiaryCalendar 已改回內建的 MonthCalendar / WeekCalendar
 import MedicationModal from '@/components/diary/MedicationModal'
 import GroomingModal from '@/components/diary/GroomingModal'
 import MeasurementModal from '@/components/diary/MeasurementModal'
@@ -25,6 +25,16 @@ import DigestionCard from '@/components/diary/DigestionCard'
 import RespiratoryCard from '@/components/diary/RespiratoryCard'
 import NeuroCard from '@/components/diary/NeuroCard'
 import ReproductiveCard from '@/components/diary/ReproductiveCard'
+
+// ─── 月曆 helper ─────────────────────────────────────────────────────────────
+
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+function getFirstDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 1).getDay()
+}
 
 // ─── 解析 AI 提取的成分字串（可能帶 ```json 標記）──────────────────────────────
 function parseIngredientText(raw: string | null | undefined): { ingredients: string[]; raw: string } | null {
@@ -124,6 +134,18 @@ const TYPE_FILTER_MAP: Record<string, string> = {
 }
 
 // ─── SVG icon shims ───────────────────────────────────────────────────────────
+
+const ChevronLeft = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+)
+
+const ChevronRight_Nav = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
 
 const ChevronUp = ({ size = 16, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -267,6 +289,191 @@ function BounceDots() {
         />
       ))}
       <style>{`@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-6px); } }`}</style>
+    </div>
+  )
+}
+
+// ─── DayDetail ───────────────────────────────────────────────────────────────
+
+interface DayRecord {
+  symptoms: Array<{ id: string; symptomType: string; severity: number; notes: string | null; createdAt: string }>
+  usages: Array<{ id: string; product: { name: string; brand: string | null; type: string }; date: string }>
+  healthMetric: { bodyScore: number | null; vitality: string | null; waterIntake: string | null } | null
+}
+
+const SYMPTOM_TYPE_ZH: Record<string, string> = {
+  medication: '用藥與看診', grooming: '洗澡美容',
+  tear: '淚腺/淚痕', skin: '皮膚搔癢', digestive: '腸胃敏感',
+  oral: '口臭牙結石', ear: '耳朵發炎', joint: '關節', other: '其他',
+}
+
+function DayDetail({ petId, date, onClose }: { petId: string; date: string; onClose: () => void }) {
+  const [data, setData] = useState<DayRecord | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/diary-records?petId=${petId}&date=${date}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: DayRecord | null) => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [petId, date])
+
+  const [m, d] = date.slice(5).split('-')
+  const isEmpty = data && data.symptoms.length === 0 && data.usages.length === 0 && !data.healthMetric
+
+  return (
+    <div className="mb-6 bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-lg text-slate-900">{m}/{d} 的紀錄</h3>
+        <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" width={14} height={14}>
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      {loading && <div className="py-6 flex justify-center"><div className="w-5 h-5 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" /></div>}
+      {!loading && isEmpty && <p className="text-sm text-slate-400 text-center py-4">這天沒有任何紀錄</p>}
+      {!loading && data && (
+        <div className="space-y-3">
+          {data.healthMetric && (
+            <div className="bg-slate-50 rounded-2xl p-3">
+              <p className="text-xs font-bold text-slate-500 mb-2">健康指標</p>
+              <div className="flex flex-wrap gap-2 text-xs font-bold">
+                {data.healthMetric.bodyScore && <span className="bg-white border border-slate-200 px-2 py-1 rounded-full">體態 {data.healthMetric.bodyScore}/9</span>}
+                {data.healthMetric.vitality && <span className="bg-white border border-slate-200 px-2 py-1 rounded-full">活力 { {low:'低落',medium:'正常',high:'活躍'}[data.healthMetric.vitality] ?? data.healthMetric.vitality}</span>}
+                {data.healthMetric.waterIntake && <span className="bg-white border border-slate-200 px-2 py-1 rounded-full">水分 {{low:'偏少',medium:'正常',high:'偏多'}[data.healthMetric.waterIntake] ?? data.healthMetric.waterIntake}</span>}
+              </div>
+            </div>
+          )}
+          {data.usages.length > 0 && (
+            <div className="bg-slate-50 rounded-2xl p-3">
+              <p className="text-xs font-bold text-slate-500 mb-2">飲食紀錄（{data.usages.length} 筆）</p>
+              <div className="flex flex-wrap gap-1.5">
+                {data.usages.map(u => (
+                  <span key={u.id} className="bg-white border border-slate-200 px-2 py-1 rounded-full text-xs font-medium text-slate-700">
+                    {u.product.brand ? `${u.product.brand} ` : ''}{u.product.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.symptoms.length > 0 && (
+            <div className="bg-slate-50 rounded-2xl p-3">
+              <p className="text-xs font-bold text-slate-500 mb-2">其他紀錄（{data.symptoms.length} 筆）</p>
+              <div className="space-y-1.5">
+                {data.symptoms.map(s => {
+                  const typeZh = SYMPTOM_TYPE_ZH[s.symptomType] ?? s.symptomType
+                  let detail = ''
+                  if (s.notes) {
+                    try {
+                      const n = JSON.parse(s.notes) as Record<string, unknown>
+                      detail = Object.values(n).flatMap(v => Array.isArray(v) ? v : [v]).filter(Boolean).slice(0, 3).join('、')
+                    } catch { detail = s.notes.slice(0, 40) }
+                  }
+                  return (
+                    <div key={s.id} className="flex items-start gap-2 text-xs font-medium text-slate-700">
+                      <span className="bg-white border border-slate-200 px-2 py-0.5 rounded-full shrink-0 font-bold">{typeZh}</span>
+                      {detail && <span className="text-slate-500">{detail}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Month calendar ───────────────────────────────────────────────────────────
+
+function MonthCalendar({ recordedDates, petId }: { recordedDates: Set<string>; petId: string }) {
+  const today = new Date()
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  const daysInMonth = getDaysInMonth(year, month)
+  const firstDay = getFirstDayOfMonth(year, month)
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  const prevMonth = () => { setSelectedDate(null); if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
+  const nextMonth = () => { setSelectedDate(null); if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+
+  return (
+    <div className="mb-4">
+      <div className="bg-white border-2 border-slate-900/5 rounded-[32px] p-5 shadow-sm relative overflow-hidden mb-3">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#FEF1E2] rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="flex justify-between items-center mb-6 px-2 relative z-10">
+          <button onClick={prevMonth} className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-black transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <h3 className="font-bold text-xl text-slate-900">{year}年 {month + 1}月</h3>
+          <button onClick={nextMonth} className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-black transition-colors">
+            <ChevronRight_Nav size={20} />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-y-4 gap-x-2 relative z-10">
+          {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+            <div key={d} className="text-center text-[11px] font-bold text-slate-400 mb-2">{d}</div>
+          ))}
+          {Array.from({ length: firstDay }, (_, i) => <div key={`empty-${i}`} className="h-12" />)}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1
+            const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const isToday = key === todayKey
+            const hasRec = recordedDates.has(key)
+            const isSelected = key === selectedDate
+            return (
+              <div key={day} onClick={() => setSelectedDate(prev => prev === key ? null : key)} className="flex flex-col items-center justify-start h-12 relative cursor-pointer group">
+                <div className={cn('w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold transition-all',
+                  isSelected ? 'bg-[#D98A53] text-white shadow-md' : isToday ? 'bg-[#111111] text-white shadow-md' : 'text-slate-700 group-hover:bg-slate-100'
+                )}>{day}</div>
+                {hasRec && <div className={cn('w-1.5 h-1.5 rounded-full mt-0.5', isSelected ? 'bg-white' : 'bg-[#7C9CE3]')} />}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {selectedDate && <DayDetail petId={petId} date={selectedDate} onClose={() => setSelectedDate(null)} />}
+    </div>
+  )
+}
+
+// ─── Week calendar ────────────────────────────────────────────────────────────
+
+function WeekCalendar({ recordedDates, petId }: { recordedDates: Set<string>; petId: string }) {
+  const today = new Date()
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(today.getDate() - today.getDay())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const days = ['日', '一', '二', '三', '四', '五', '六']
+
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between items-center mb-3 bg-white border-2 border-slate-900/5 rounded-3xl p-4 shadow-sm relative overflow-hidden">
+        {days.map((label, i) => {
+          const d = new Date(startOfWeek)
+          d.setDate(startOfWeek.getDate() + i)
+          const isToday = d.toDateString() === today.toDateString()
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          const hasRec = recordedDates.has(key)
+          const isSelected = key === selectedDate
+          return (
+            <div key={i} onClick={() => setSelectedDate(prev => prev === key ? null : key)} className="flex flex-col items-center gap-2 relative z-10 cursor-pointer">
+              <span className="text-xs font-bold text-slate-400">{label}</span>
+              <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all',
+                isSelected ? 'bg-[#D98A53] text-white shadow-md' : isToday ? 'bg-[#111111] text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'
+              )}>{d.getDate()}</div>
+              {hasRec && <div className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-[#D98A53]' : 'bg-[#7C9CE3]')} />}
+            </div>
+          )
+        })}
+      </div>
+      {selectedDate && <DayDetail petId={petId} date={selectedDate} onClose={() => setSelectedDate(null)} />}
     </div>
   )
 }
@@ -1059,6 +1266,8 @@ export default function DiaryPage() {
   const [planStart, setPlanStart]       = useState('')
 
   // ─ Modal 開關 ──────────────────────────────────────────────────────────────
+  const [calTab, setCalTab] = useState<'month' | 'week'>('week')
+
   const [showMedModal, setShowMedModal]     = useState(false)
   const [showGroomModal, setShowGroomModal] = useState(false)
   const [showMeasModal, setShowMeasModal]   = useState(false)
@@ -1197,13 +1406,15 @@ export default function DiaryPage() {
         onOpenMeasurement={() => setShowMeasModal(true)}
       />
 
-      {/* ─── DiaryCalendar ────────────────────────────────────────────── */}
-      <DiaryCalendar
-        petId={petId}
-        selectedDate={selectedDate}
-        onDateSelect={setSelectedDate}
-        recordedDates={recordedDates}
-      />
+      {/* ─── 月曆 / 週曆 toggle ──────────────────────────────────────── */}
+      <div className="flex bg-slate-100 p-1.5 rounded-full">
+        <button onClick={() => setCalTab('week')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
+        <button onClick={() => setCalTab('month')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
+      </div>
+      {calTab === 'week'
+        ? <WeekCalendar recordedDates={recordedDates} petId={petId} />
+        : <MonthCalendar recordedDates={recordedDates} petId={petId} />
+      }
 
       {/* ─── 當日健康紀錄分隔標題 ─────────────────────────────────────── */}
       <div className="flex items-center gap-3">
