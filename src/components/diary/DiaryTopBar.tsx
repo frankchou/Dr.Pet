@@ -1,0 +1,127 @@
+'use client'
+
+// ─── Props ─────────────────────────────────────────────────────────────────────
+
+export interface DiaryTopBarProps {
+  onOpenMedication: () => void
+  onOpenGrooming: () => void
+  onOpenMeasurement: () => void
+}
+
+// ─── Inline SVG icons ─────────────────────────────────────────────────────────
+
+const MicIcon = () => (
+  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8" y1="23" x2="16" y2="23" />
+  </svg>
+)
+
+const MenuIcon = () => (
+  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6"  x2="21" y2="6"  />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+)
+
+// 用藥看診 icon（藥丸）
+const PillIcon = () => (
+  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v3.5" />
+    <circle cx="17" cy="17" r="5" />
+    <path d="m14.5 14.5 5 5" />
+  </svg>
+)
+
+// 洗澡美容 icon（剪刀）
+const ScissorsIcon = () => (
+  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <line x1="20" y1="4"  x2="8.12" y2="15.88" />
+    <line x1="14.47" y1="14.48" x2="20" y2="20" />
+    <line x1="8.12"  y1="8.12"  x2="12" y2="12" />
+  </svg>
+)
+
+// 量測紀錄 icon（磅秤）
+const ScaleIcon = () => (
+  <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 3h12l1 6H5L6 3z" />
+    <path d="M5 9c0 4.42 3.13 8 7 8s7-3.58 7-8" />
+    <line x1="12" y1="17" x2="12" y2="21" />
+    <line x1="8"  y1="21" x2="16" y2="21" />
+  </svg>
+)
+
+// ─── 快捷按鈕 ─────────────────────────────────────────────────────────────────
+
+interface ShortcutButtonProps {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}
+
+function ShortcutButton({ icon, label, onClick }: ShortcutButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex-1 bg-white border border-slate-200 rounded-2xl py-3 flex flex-col items-center gap-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors active:scale-95"
+    >
+      <div className="w-9 h-9 rounded-xl bg-[#FEF1E2] flex items-center justify-center">
+        {icon}
+      </div>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+// ─── DiaryTopBar ──────────────────────────────────────────────────────────────
+
+export default function DiaryTopBar({ onOpenMedication, onOpenGrooming, onOpenMeasurement }: DiaryTopBarProps) {
+  return (
+    <div className="space-y-3">
+      {/* 語音輸入列 */}
+      <div className="flex items-center gap-2">
+        {/* 麥克風按鈕（僅 UI，暫不實作語音 API）*/}
+        <button
+          type="button"
+          disabled
+          className="bg-[#111111] text-white w-12 h-12 rounded-full flex items-center justify-center shrink-0 opacity-80 cursor-not-allowed"
+          aria-label="語音輸入（尚未開放）"
+        >
+          <MicIcon />
+        </button>
+
+        {/* 文字輸入框（純 UI 展示）*/}
+        <div className="flex-1 flex items-center bg-slate-100 rounded-2xl px-4 h-12 gap-2">
+          <span className="flex-1 text-sm text-slate-400 select-none">描述寵物的狀況...</span>
+          <MenuIcon />
+        </div>
+      </div>
+
+      {/* 三個快捷按鈕 */}
+      <div className="flex gap-2">
+        <ShortcutButton
+          icon={<PillIcon />}
+          label="用藥看診"
+          onClick={onOpenMedication}
+        />
+        <ShortcutButton
+          icon={<ScissorsIcon />}
+          label="洗澡美容"
+          onClick={onOpenGrooming}
+        />
+        <ShortcutButton
+          icon={<ScaleIcon />}
+          label="量測紀錄"
+          onClick={onOpenMeasurement}
+        />
+      </div>
+    </div>
+  )
+}

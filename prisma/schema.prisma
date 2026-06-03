@@ -106,7 +106,10 @@ model Pet {
   productReactions     ProductReaction[]
   communityRecs        CommunityRec[]
   healthMetrics        HealthMetric[]
-  mealPlans            DailyMealPlan[]
+  dailyHealthLogs      DailyHealthLog[]
+  medicationRecords    MedicationRecord[]
+  groomingRecords      GroomingRecord[]
+  measurementRecords   MeasurementRecord[]
 }
 
 model SymptomEntry {
@@ -136,7 +139,6 @@ model Product {
   reactions      ProductReaction[]
   communityRecsFor   CommunityRec[] @relation("BadProduct")
   communityRecsRec   CommunityRec[] @relation("RecommendedProduct")
-  mealPlanItems      MealPlanItem[]
 }
 
 model ProductUsage {
@@ -287,46 +289,92 @@ model HealthMetric {
   @@unique([petId, date])
 }
 
-// 飲食計畫：每日配餐（一天一筆，含早中晚餐項目）
-model DailyMealPlan {
-  id        String         @id @default(cuid())
-  petId     String
-  pet       Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
-  date      String         // YYYY-MM-DD
-  items     MealPlanItem[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+// 每日健康日誌主體
+model DailyHealthLog {
+  id              String   @id @default(cuid())
+  petId           String
+  pet             Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date            String   // YYYY-MM-DD
+  appetite        String?  // 胃口極佳/食慾正常/猶豫慢食/挑食偏食/完全拒食
+  waterMl         Int?     // 飲水毫升
+  waterStatus     String?  // 飲水正常/異常狂喝/幾乎沒喝
+  stoolType       String?  // 羊便便/正常成形/便便偏軟/泥水腹瀉
+  stoolDetails    String   @default("[]") // JSON array：帶血/帶黏液/顏色異常/排便費力/氣味極臭
+  urineStatus     String?  // 尿量正常/頻尿蹲/極稀少/血尿
+  vitality        String?  // 精神飽滿/活動意願高/異常疲倦
+  mood            String   @default("[]") // JSON array：平靜放鬆/焦躁不安/攻擊低吼/異常嚎叫
+  skinHair        String   @default("[]") // JSON array 多選
+  skinHairPhotos  String   @default("[]") // JSON array 圖片 URL
+  eyeEar          String   @default("[]") // JSON array
+  eyeEarPhotos    String   @default("[]")
+  dental          String   @default("[]") // JSON array
+  dentalPhotos    String   @default("[]")
+  digestion       String   @default("[]") // JSON array
+  digestionPhotos String   @default("[]")
+  respiratory     String   @default("[]") // JSON array
+  neuro           String   @default("[]") // JSON array
+  reproductive    String   @default("[]") // JSON array（依性別存不同選項）
+  dailyChecklist  String   @default("[]") // JSON array：已完成的例行項目
+  dietStatusTab   String?  // 今日飲食狀態 tab：all/reduced/forbidden
+  mealStatuses    String   @default("{}") // JSON：{ morning: 'done'|'refused'|'outside', noon: ..., evening: ... }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([petId, date])
 }
 
-// 配餐明細：每餐每項食物 / 產品
-model MealPlanItem {
-  id             String        @id @default(cuid())
-  planId         String
-  plan           DailyMealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  session        String        // "morning" | "noon" | "evening"
-  productId      String?
-  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
-  customName     String?       // 若非從 Product 選取，直接輸入商品名
-  quantity       Float         @default(1)
-  unit           String        @default("份")  // 平匙、克、朵、錠、份 等
-  estimatedGrams Float?        // 預估克數，由前端或 AI 計算
-  tags           String        @default("[]")  // JSON array 字串，例如 ["狗飼料","無穀"]
-  sortOrder      Int           @default(0)
-  createdAt      DateTime      @default(now())
+// 用藥與看診記錄
+model MedicationRecord {
+  id            String    @id @default(cuid())
+  petId         String
+  pet           Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date          String    // YYYY-MM-DD
+  vaccines      String    @default("[]") // JSON array
+  deworming     String    @default("[]") // JSON array
+  prescriptions String    @default("[]") // JSON array
+  clinicVisits  String    @default("[]") // JSON array
+  photoUrl      String?   // 藥袋/收據照片
+  nextReminder  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
-// 快訊文章：食安通報、地雷食物、健康知識等
-model NewsArticle {
-  id          String    @id @default(cuid())
-  category    String    // "food_safety" | "danger" | "health"
-  subCategory String?   // 食安通報、廠商警告、地雷食物、室內植物 等
-  title       String
-  summary     String
-  sourceUrl   String?
-  sourceName  String?
-  publishedAt DateTime?
-  isUrgent    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+// 洗澡美容記錄
+model GroomingRecord {
+  id                String    @id @default(cuid())
+  petId             String
+  pet               Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date              String    // YYYY-MM-DD
+  mode              String    // home/basic/full
+  medBath           Boolean   @default(false)
+  medBathProduct    String?
+  carbonatedSpa     Boolean   @default(false)
+  carbonatedProduct String?
+  dentalClean       Boolean   @default(false)
+  dentalProduct     String?
+  customTreatment   Boolean   @default(false)
+  customName        String?
+  photoUrl          String?
+  nextReminder      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// 量測與追蹤記錄
+model MeasurementRecord {
+  id                 String    @id @default(cuid())
+  petId              String
+  pet                Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date               String    // YYYY-MM-DD
+  weightKg           Float?
+  bodyCondition      String?   // lean/normal/overweight
+  rrr                Int?      // 靜止呼吸率（次/分）
+  bloodSugarTiming   String?   // fasting/postMeal2h/postInsulin
+  bloodSugarMgdl     Float?
+  bloodPressureSys   Int?      // 收縮壓
+  bloodPressureDia   Int?      // 舒張壓
+  tempMethod         String?   // rectal/ear/axillary
+  tempCelsius        Float?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
