@@ -111,3 +111,18 @@ export interface InsightTrigger {
   basis: string
   action: string
 }
+
+export type NewsCategory = 'food_safety' | 'danger' | 'health'
+
+export interface NewsArticle {
+  id: string
+  category: string
+  subCategory?: string | null
+  title: string
+  summary: string
+  sourceUrl?: string | null
+  sourceName?: string | null
+  publishedAt?: Date | string | null
+  isUrgent: boolean
+  createdAt: Date | string
+}

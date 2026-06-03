@@ -32,5 +32,8 @@
     "prisma": "^7.4.1",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "jiti prisma/seed.ts"
   }
 }

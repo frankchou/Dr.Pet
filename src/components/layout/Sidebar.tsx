@@ -12,11 +12,22 @@ interface SidebarPet {
 const NAV_ITEMS = [
   {
     href: '/',
-    label: '首頁',
+    label: '毛孩',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    ),
+  },
+  {
+    href: '/diet',
+    label: '飲食',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+        <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+        <line x1="7" y1="2" x2="7" y2="22" />
+        <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
       </svg>
     ),
   },
@@ -141,8 +152,8 @@ export default function Sidebar() {
 
       {/* 主導覽 */}
       <nav className="flex-1 px-4 space-y-1">
-        {/* 首頁、日誌 */}
-        {NAV_ITEMS.slice(0, 2).map((item) => (
+        {/* 毛孩、飲食、日誌 */}
+        {NAV_ITEMS.slice(0, 3).map((item) => (
           <Link key={item.href} href={item.href} className={itemClass(item.href)}>
             {item.icon}
             {item.label}
@@ -162,7 +173,7 @@ export default function Sidebar() {
         </Link>
 
         {/* 營養師、快訊 */}
-        {NAV_ITEMS.slice(2).map((item) => (
+        {NAV_ITEMS.slice(3).map((item) => (
           <Link key={item.href} href={item.href} className={itemClass(item.href)}>
             {item.icon}
             {item.label}

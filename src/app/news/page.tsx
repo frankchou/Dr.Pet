@@ -1,202 +1,364 @@
 'use client'
 
-/* ── 型別 ─────────────────────────────────────────── */
+import { useState, useEffect, useCallback } from 'react'
+import type { NewsArticle, NewsCategory } from '@/types'
 
-type NewsType = 'danger' | 'award' | 'recall' | 'knowledge' | 'promo' | 'system'
+/* ── 工具函式 ────────────────────────────────────────── */
 
-interface NewsItem {
-  type: NewsType
-  used: boolean
-  title: string
-  source: string
-  time: string
-  unread: boolean
+function formatPublishedDate(date: Date | string | null | undefined): string {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}.${m}.${day}`
 }
 
-/* ── 類型配置 ─────────────────────────────────────── */
-
-const NEWS_TYPES: Record<NewsType, { label: string; bg: string; color: string; iconPath: string }> = {
-  danger: {
-    label: '食安警示', bg: '#FEF2F2', color: '#DC2626',
-    iconPath: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z|M12 9v4|M12 17h.01',
-  },
-  award: {
-    label: '得獎好消息', bg: '#E2F3E4', color: '#2D6A4F',
-    iconPath: 'circle:12,8,6|M15.477 12.89L17 22l-5-3-5 3 1.523-9.11',
-  },
-  recall: {
-    label: '食安公告', bg: '#FEF1E2', color: '#CA8A04',
-    iconPath: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z|M12 8v4|M12 16h.01',
-  },
-  knowledge: {
-    label: '營養知識', bg: '#EDF3FB', color: '#475569',
-    iconPath: 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z|M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z',
-  },
-  promo: {
-    label: '優惠活動', bg: '#FDE2EC', color: '#BE3D73',
-    iconPath: 'M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z|M7 7h.01',
-  },
-  system: {
-    label: '系統通知', bg: '#F1F5F9', color: '#64748B',
-    iconPath: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9|M13.73 21a2 2 0 0 1-3.46 0',
-  },
-}
-
-/* ── 靜態示範資料 ───────────────────────────────────── */
-
-const NEWS_BRAND: NewsItem[] = [
-  {
-    type: 'danger', used: true, unread: true,
-    title: '「自然本色」部分批次鮭魚配方啟動自主回收',
-    source: '食品藥物管理署', time: '2 小時前',
-  },
-  {
-    type: 'award', used: true, unread: true,
-    title: '「毛孩關鍵 益生菌」榮獲 2026 台灣寵物保健金獎',
-    source: '品牌新聞', time: '1 天前',
-  },
-  {
-    type: 'recall', used: true, unread: false,
-    title: '你常用的「純啖」雞胸肉塊通過 SGS 重金屬檢驗合格',
-    source: '品牌公告', time: '3 天前',
-  },
-]
-
-const NEWS_GENERAL: NewsItem[] = [
-  {
-    type: 'recall', used: false, unread: false,
-    title: '農業部公告：市售進口飼料黴菌毒素抽驗結果出爐',
-    source: '農業部', time: '3 天前',
-  },
-  {
-    type: 'knowledge', used: false, unread: false,
-    title: '老年犬腎臟保健：磷與鈣的攝取要點懶人包',
-    source: '營養知識', time: '4 天前',
-  },
-  {
-    type: 'promo', used: false, unread: false,
-    title: '換食季限定：精選低敏無穀飼料 9 折優惠',
-    source: '優惠活動', time: '5 天前',
-  },
-  {
-    type: 'system', used: false, unread: false,
-    title: '「布丁」的年度疫苗接種剩 15 天，記得預約',
-    source: '系統通知', time: '1 週前',
-  },
-]
-
-/* ── 類型圖示（依 iconPath 規格渲染）───────────────── */
-
-function NewsTypeIcon({ type, size = 22 }: { type: NewsType; size?: number }) {
-  const cfg = NEWS_TYPES[type]
-  const parts = cfg.iconPath.split('|')
-
-  return (
-    <svg
-      viewBox="0 0 24 24" fill="none" stroke={cfg.color}
-      strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
-      width={size} height={size}
-    >
-      {parts.map((part, i) => {
-        if (part.startsWith('circle:')) {
-          const [, cx, cy, r] = part.split(':')[1].split(',')
-          return <circle key={i} cx={cx} cy={cy} r={r} />
-        }
-        return <path key={i} d={part} />
-      })}
-    </svg>
-  )
-}
-
-/* ── 新聞卡片 ─────────────────────────────────────── */
-
-function NewsCard({ n }: { n: NewsItem }) {
-  const t = NEWS_TYPES[n.type]
-  return (
-    <button className="w-full text-left bg-white border-2 border-slate-900/5 rounded-[24px] p-4 flex gap-3.5 items-start shadow-sm hover:shadow-md transition-shadow relative">
-      {n.unread && (
-        <span className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[#DC2626]" aria-label="未讀" />
-      )}
-      <div
-        className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: t.bg }}
-      >
-        <NewsTypeIcon type={n.type} size={22} />
-      </div>
-      <div className="flex-1 min-w-0 pr-3">
-        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-          <span
-            className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: t.bg, color: t.color }}
-          >
-            {t.label}
-          </span>
-          {n.used && (
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#111111] text-white">
-              您的毛孩正在食用
-            </span>
-          )}
-        </div>
-        <h4 className="font-bold text-slate-900 leading-snug text-sm">{n.title}</h4>
-        <p className="text-[11px] font-bold text-slate-400 mt-1.5">{n.source} · {n.time}</p>
-      </div>
-    </button>
-  )
-}
-
-/* ── 頁面圖示 ──────────────────────────────────────── */
+/* ── SVG 圖示 ────────────────────────────────────────── */
 
 function IconNewspaper({ size = 24 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}
-      strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+    >
       <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1m2 13a2 2 0 0 1-2-2V7m2 13a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7z" />
     </svg>
   )
 }
 
-/* ── 主元件 ──────────────────────────────────────── */
+function IconAlertTriangle({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+    >
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  )
+}
+
+function IconFork({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+    >
+      <path d="M12 2v8M8 2v3a4 4 0 0 0 8 0V2M12 10v12" />
+    </svg>
+  )
+}
+
+function IconLeaf({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+    >
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 8-9 9" />
+    </svg>
+  )
+}
+
+function IconEmpty({ size = 40 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
+    </svg>
+  )
+}
+
+/* ── 骨架載入元件 ─────────────────────────────────────── */
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 animate-pulse">
+      <div className="flex gap-3 items-start">
+        <div className="w-16 h-4 bg-slate-100 rounded-full" />
+        <div className="ml-auto w-20 h-4 bg-slate-100 rounded-full" />
+      </div>
+      <div className="mt-3 w-full h-4 bg-slate-100 rounded" />
+      <div className="mt-2 w-3/4 h-4 bg-slate-100 rounded" />
+      <div className="mt-3 w-full h-3 bg-slate-100 rounded" />
+      <div className="mt-1.5 w-5/6 h-3 bg-slate-100 rounded" />
+    </div>
+  )
+}
+
+/* ── Tab 1：食安警報卡片 ────────────────────────────── */
+
+function subCategoryStyle(sub: string | null | undefined): { bg: string; text: string } {
+  if (sub === '食安通報') return { bg: 'bg-red-50', text: 'text-red-600' }
+  if (sub === '廠商警告') return { bg: 'bg-orange-50', text: 'text-orange-600' }
+  return { bg: 'bg-slate-50', text: 'text-slate-600' }
+}
+
+function FoodSafetyCard({ article }: { article: NewsArticle }) {
+  const style = subCategoryStyle(article.subCategory)
+  const dateStr = formatPublishedDate(article.publishedAt)
+
+  return (
+    <div
+      className={`bg-white rounded-2xl shadow-sm p-4 border ${
+        article.isUrgent ? 'border-red-100' : 'border-slate-100'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        {article.subCategory && (
+          <span
+            className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${style.bg} ${style.text}`}
+          >
+            {article.subCategory}
+          </span>
+        )}
+        {dateStr && (
+          <span className="text-[11px] text-slate-400 font-medium shrink-0 ml-auto">{dateStr}</span>
+        )}
+      </div>
+      <h4
+        className={`font-bold leading-snug text-sm ${
+          article.isUrgent ? 'text-red-600' : 'text-slate-900'
+        }`}
+      >
+        {article.title}
+      </h4>
+      <p className="mt-1.5 text-sm text-slate-600 line-clamp-3">{article.summary}</p>
+    </div>
+  )
+}
+
+/* ── Tab 2：危險禁忌卡片 ────────────────────────────── */
+
+type DangerSubConfig = {
+  icon: React.ReactNode
+  labelColor: string
+  barColor: string
+}
+
+function getDangerConfig(sub: string | null | undefined): DangerSubConfig {
+  if (sub === '地雷食物') {
+    return {
+      icon: <IconFork size={16} color="#C4714A" />,
+      labelColor: 'text-[#C4714A]',
+      barColor: 'bg-[#C4714A]',
+    }
+  }
+  if (sub === '室內植物') {
+    return {
+      icon: <IconLeaf size={16} color="#16a34a" />,
+      labelColor: 'text-green-600',
+      barColor: 'bg-green-500',
+    }
+  }
+  return {
+    icon: <IconAlertTriangle size={16} color="#64748b" />,
+    labelColor: 'text-slate-600',
+    barColor: 'bg-slate-400',
+  }
+}
+
+function DangerCard({ article }: { article: NewsArticle }) {
+  const cfg = getDangerConfig(article.subCategory)
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 flex gap-3 items-stretch overflow-hidden">
+      {/* 左側色條 */}
+      <div className={`w-[3px] rounded-full shrink-0 ${cfg.barColor}`} />
+      <div className="flex-1 min-w-0">
+        {article.subCategory && (
+          <div className={`flex items-center gap-1.5 mb-1.5 ${cfg.labelColor}`}>
+            {cfg.icon}
+            <span className="text-[11px] font-bold">{article.subCategory}</span>
+          </div>
+        )}
+        <h4 className="font-bold text-slate-900 leading-snug text-sm">{article.title}</h4>
+        <p className="mt-1.5 text-sm text-slate-600 line-clamp-3">{article.summary}</p>
+      </div>
+    </div>
+  )
+}
+
+/* ── Tab 3：健康知識卡片 ─────────────────────────────── */
+
+function HealthCard({ article }: { article: NewsArticle }) {
+  const handleOpenSource = () => {
+    if (article.sourceUrl) {
+      window.open(article.sourceUrl, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
+      <h4 className="font-bold text-slate-900 leading-snug text-sm">{article.title}</h4>
+      <p className="mt-1.5 text-sm text-slate-600 line-clamp-3">{article.summary}</p>
+      <div className="flex items-center justify-between mt-3">
+        {article.sourceName ? (
+          <span className="text-blue-500 text-sm font-medium">{article.sourceName}</span>
+        ) : (
+          <span />
+        )}
+        {article.sourceUrl && (
+          <button
+            onClick={handleOpenSource}
+            className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors"
+          >
+            查看原文 ↗
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── Tab 設定 ────────────────────────────────────────── */
+
+type TabConfig = {
+  key: NewsCategory
+  label: string
+}
+
+const TABS: TabConfig[] = [
+  { key: 'food_safety', label: '食安警報' },
+  { key: 'danger', label: '危險禁忌' },
+  { key: 'health', label: '健康知識' },
+]
+
+/* ── 主元件 ──────────────────────────────────────────── */
 
 export default function NewsPage() {
-  const unreadCount = NEWS_BRAND.filter(n => n.unread).length
+  const [activeTab, setActiveTab] = useState<NewsCategory>('food_safety')
+  const [articles, setArticles] = useState<NewsArticle[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchArticles = useCallback(async (category: NewsCategory) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/news?category=${category}`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data: NewsArticle[] = await res.json()
+      setArticles(data)
+    } catch {
+      setError('無法載入資料，請稍後再試。')
+      setArticles([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // 初始載入食安警報
+  useEffect(() => {
+    fetchArticles('food_safety')
+  }, [fetchArticles])
+
+  const handleTabChange = (tab: NewsCategory) => {
+    if (tab === activeTab) return
+    setActiveTab(tab)
+    fetchArticles(tab)
+  }
+
+  const renderCard = (article: NewsArticle) => {
+    if (activeTab === 'food_safety') return <FoodSafetyCard key={article.id} article={article} />
+    if (activeTab === 'danger') return <DangerCard key={article.id} article={article} />
+    return <HealthCard key={article.id} article={article} />
+  }
 
   return (
     <div className="px-6 md:px-8 py-6 min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#FEF1E2] flex items-center justify-center text-[#D98A53] shrink-0">
+        <div className="w-12 h-12 rounded-2xl bg-[#FEF1E2] flex items-center justify-center text-[#C4714A] shrink-0">
           <IconNewspaper size={24} />
         </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">快訊與通知</h1>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold tracking-tight">快訊通知</h1>
           <p className="text-sm text-slate-500 font-medium">毛孩相關消息主動推播給你</p>
         </div>
+        {/* 最新動態 badge，目前為 UI 裝飾，後續可接通知數量 */}
+        <span className="shrink-0 text-[11px] font-bold text-white bg-[#C4714A] rounded-full px-3 py-1">
+          最新動態
+        </span>
       </div>
 
-      {/* 與毛孩相關區塊 */}
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-base font-bold text-slate-900">與你的毛孩相關</h2>
-        {unreadCount > 0 && (
-          <span className="text-[11px] font-bold text-white bg-[#DC2626] rounded-full px-2 py-0.5">
-            {unreadCount} 則新訊息
-          </span>
+      {/* Tab 切換器 */}
+      <div className="flex gap-2 mb-5">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabChange(tab.key)}
+            className={`flex-1 text-sm font-bold px-3 py-2 rounded-full transition-colors ${
+              activeTab === tab.key
+                ? 'bg-[#111111] text-white'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 內容區 */}
+      <div className="flex-1 space-y-3">
+        {isLoading && (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
         )}
-      </div>
-      <p className="text-xs font-medium text-slate-400 mb-3">
-        你正在使用的食品廠商，有得獎、食安等好壞消息時會主動通知。
-      </p>
-      <div className="space-y-3 mb-8">
-        {NEWS_BRAND.map((n, i) => (
-          <NewsCard key={i} n={n} />
-        ))}
-      </div>
 
-      {/* 其他通知區塊 */}
-      <h2 className="text-base font-bold text-slate-900 mb-3">其他通知</h2>
-      <div className="space-y-3">
-        {NEWS_GENERAL.map((n, i) => (
-          <NewsCard key={i} n={n} />
-        ))}
+        {!isLoading && error && (
+          <div className="flex flex-col items-center gap-3 py-16 text-slate-400">
+            <IconEmpty size={40} />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        {!isLoading && !error && articles.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16 text-slate-400">
+            <IconEmpty size={40} />
+            <p className="text-sm font-medium">暫無相關資訊，AI 定期更新中...</p>
+          </div>
+        )}
+
+        {!isLoading && !error && articles.map(renderCard)}
       </div>
     </div>
   )

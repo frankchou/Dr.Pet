@@ -6,11 +6,22 @@ import { useState, useEffect } from 'react'
 const NAV_ITEMS = [
   {
     href: '/',
-    label: '首頁',
+    label: '毛孩',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    ),
+  },
+  {
+    href: '/diet',
+    label: '飲食',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+        <line x1="7" y1="2" x2="7" y2="22" />
+        <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
       </svg>
     ),
   },
@@ -72,7 +83,7 @@ export default function BottomNav() {
       style={{ boxShadow: 'var(--pp-shadow-nav)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-end h-[60px]">
-        {/* 左側兩個 tab */}
+        {/* 左側三個 tab */}
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}

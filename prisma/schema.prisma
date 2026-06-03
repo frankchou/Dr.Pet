@@ -106,6 +106,7 @@ model Pet {
   productReactions     ProductReaction[]
   communityRecs        CommunityRec[]
   healthMetrics        HealthMetric[]
+  mealPlans            DailyMealPlan[]
 }
 
 model SymptomEntry {
@@ -135,6 +136,7 @@ model Product {
   reactions      ProductReaction[]
   communityRecsFor   CommunityRec[] @relation("BadProduct")
   communityRecsRec   CommunityRec[] @relation("RecommendedProduct")
+  mealPlanItems      MealPlanItem[]
 }
 
 model ProductUsage {
@@ -283,4 +285,48 @@ model HealthMetric {
   updatedAt   DateTime @updatedAt
 
   @@unique([petId, date])
+}
+
+// 飲食計畫：每日配餐（一天一筆，含早中晚餐項目）
+model DailyMealPlan {
+  id        String         @id @default(cuid())
+  petId     String
+  pet       Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date      String         // YYYY-MM-DD
+  items     MealPlanItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([petId, date])
+}
+
+// 配餐明細：每餐每項食物 / 產品
+model MealPlanItem {
+  id             String        @id @default(cuid())
+  planId         String
+  plan           DailyMealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  session        String        // "morning" | "noon" | "evening"
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  customName     String?       // 若非從 Product 選取，直接輸入商品名
+  quantity       Float         @default(1)
+  unit           String        @default("份")  // 平匙、克、朵、錠、份 等
+  estimatedGrams Float?        // 預估克數，由前端或 AI 計算
+  tags           String        @default("[]")  // JSON array 字串，例如 ["狗飼料","無穀"]
+  sortOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
+}
+
+// 快訊文章：食安通報、地雷食物、健康知識等
+model NewsArticle {
+  id          String    @id @default(cuid())
+  category    String    // "food_safety" | "danger" | "health"
+  subCategory String?   // 食安通報、廠商警告、地雷食物、室內植物 等
+  title       String
+  summary     String
+  sourceUrl   String?
+  sourceName  String?
+  publishedAt DateTime?
+  isUrgent    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
 }

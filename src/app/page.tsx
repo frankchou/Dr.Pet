@@ -368,7 +368,36 @@ export default function HomePage() {
       {(loading || currentPet) && (
         <div className="flex flex-col gap-8 pb-8">
 
-          {/* 2. 健康檔案概覽 */}
+          {/* 1. 重要日程 */}
+          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-700">
+                <SvgSparkles size={16} />
+              </div>
+              <h3 className="font-bold text-slate-800">重要日程</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#D98A53]/50 transition-colors cursor-pointer bg-white">
+                <SvgCalendar size={24} />
+                <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">年度疫苗</span>
+                <span className="text-sm font-bold text-slate-400">--</span>
+              </div>
+              <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#5C946E]/50 transition-colors cursor-pointer bg-white">
+                <SvgDroplets size={24} />
+                <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">體外驅蟲</span>
+                <span className="text-sm font-bold text-slate-400">--</span>
+              </div>
+              <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#F391B3]/50 transition-colors cursor-pointer bg-white">
+                <SvgCake size={24} />
+                <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">生日</span>
+                <span className="text-sm font-bold text-slate-700">
+                  {birthdayMMDD ?? '--'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 健康檔案概覽 */}
           <div className="flex flex-col">
             <div className="flex items-end justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -453,7 +482,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 3. 快速功能 */}
+            {/* 4. 快速功能 */}
             <h2 className="text-xl font-bold tracking-tight mb-4">快速功能</h2>
             <div className="flex flex-col gap-4 mb-2">
               {/* 毛孩成長分析卡 */}
@@ -502,39 +531,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 4 + 5. 日程區塊 */}
+          {/* 3 + 4. 日程區塊 */}
           <div className="w-full flex flex-col">
 
-            {/* 4. 重要日程 */}
-            <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-8 lg:mb-10">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-700">
-                  <SvgSparkles size={16} />
-                </div>
-                <h3 className="font-bold text-slate-800">重要日程</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#D98A53]/50 transition-colors cursor-pointer bg-white">
-                  <SvgCalendar size={24} />
-                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">年度疫苗</span>
-                  <span className="text-sm font-bold text-slate-400">--</span>
-                </div>
-                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#5C946E]/50 transition-colors cursor-pointer bg-white">
-                  <SvgDroplets size={24} />
-                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">體外驅蟲</span>
-                  <span className="text-sm font-bold text-slate-400">--</span>
-                </div>
-                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#F391B3]/50 transition-colors cursor-pointer bg-white">
-                  <SvgCake size={24} />
-                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">生日</span>
-                  <span className="text-sm font-bold text-slate-700">
-                    {birthdayMMDD ?? '--'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 5. 未來日程表 */}
+            {/* 3. 未來日程表 */}
             <div className="flex items-end justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
@@ -595,7 +595,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* 6. 健康指標 */}
+            {/* 5. 健康指標 */}
             <div className="flex items-center gap-2 mt-10 mb-4">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
                 <SvgHeartPulse />
@@ -617,7 +617,7 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 7. 營養綜合分析 */}
+            {/* 6. 營養綜合分析 */}
             <IngredientAnalysis petId={currentPetId} />
 
           </div>
