@@ -4,7 +4,10 @@ import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
+    const session = await auth()
+    const userId = session?.user?.id
     const pets = await prisma.pet.findMany({
+      where: userId ? { userId } : {},
       orderBy: { createdAt: 'desc' },
     })
     return NextResponse.json(pets)

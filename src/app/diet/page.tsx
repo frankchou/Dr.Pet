@@ -479,6 +479,11 @@ function SessionAccordion({
               onAdded={handleItemAdded}
               onCancel={() => setShowForm(false)}
             />
+          ) : showForm && !planId ? (
+            <div className="w-full py-2.5 flex items-center justify-center gap-2 text-sm text-slate-400">
+              <Spinner className="text-slate-300 w-4 h-4" />
+              建立配餐計畫中…
+            </div>
           ) : (
             <button
               onClick={() => setShowForm(true)}
@@ -1032,7 +1037,7 @@ interface PetBasicInfo {
 
 export default function DietPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('daily')
-  const [openSession, setOpenSession] = useState<Session>('morning')
+  const [openSession, setOpenSession] = useState<Session | null>('morning')
   const [petId, setPetId] = useState<string | null>(null)
   const [petInfo, setPetInfo] = useState<PetBasicInfo | null>(null)
   const [plan, setPlan] = useState<MealPlan | null>(null)
@@ -1196,36 +1201,30 @@ export default function DietPage() {
     (plan?.items ?? []).filter(it => it.session === session)
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      {/* 頁面標題 */}
-      <div className="sticky top-0 z-40 bg-[#FAF7F2]/90 backdrop-blur-md">
-        <div className="max-w-[480px] mx-auto px-4 pt-12 pb-3">
-          <h1 className="text-2xl font-bold text-[#2C1810]">飲食計畫</h1>
+    <div className="px-6 md:px-8 min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 pb-36">
 
-          {/* Tab 切換 */}
-          <div className="mt-4 flex gap-1 bg-slate-100 rounded-2xl p-1">
-            {([
-              { key: 'daily' as TabKey, label: '日常配餐' },
-              { key: 'switch' as TabKey, label: '換食計畫' },
-            ] as const).map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  'flex-1 py-2 rounded-xl text-sm font-bold transition-all',
-                  activeTab === tab.key
-                    ? 'bg-white text-[#2C1810] shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Tab 切換 */}
+      <div className="flex bg-slate-100 p-1.5 rounded-full mb-5">
+        {([
+          { key: 'daily' as TabKey, label: '日常配餐' },
+          { key: 'switch' as TabKey, label: '換食計畫' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'flex-1 py-2 rounded-full text-sm font-bold transition-all',
+              activeTab === tab.key
+                ? 'bg-[#111111] text-white shadow-sm'
+                : 'text-slate-500 hover:text-black',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="max-w-[480px] mx-auto px-4 pb-40">
+      <div className="flex-1">
         {activeTab === 'switch' ? (
           <SwitchPlanComingSoon />
         ) : (
@@ -1246,7 +1245,7 @@ export default function DietPage() {
                   session="morning"
                   items={itemsForSession('morning')}
                   isOpen={openSession === 'morning'}
-                  onToggle={() => setOpenSession(prev => prev === 'morning' ? 'morning' : 'morning')}
+                  onToggle={() => setOpenSession(null)}
                   onOpen={() => setOpenSession('morning')}
                   plan={plan}
                   onEnsurePlan={handleSessionNeedsPlan}
@@ -1257,7 +1256,7 @@ export default function DietPage() {
                   session="noon"
                   items={itemsForSession('noon')}
                   isOpen={openSession === 'noon'}
-                  onToggle={() => setOpenSession('noon')}
+                  onToggle={() => setOpenSession(null)}
                   onOpen={() => setOpenSession('noon')}
                   plan={plan}
                   onEnsurePlan={handleSessionNeedsPlan}
@@ -1268,7 +1267,7 @@ export default function DietPage() {
                   session="evening"
                   items={itemsForSession('evening')}
                   isOpen={openSession === 'evening'}
-                  onToggle={() => setOpenSession('evening')}
+                  onToggle={() => setOpenSession(null)}
                   onOpen={() => setOpenSession('evening')}
                   plan={plan}
                   onEnsurePlan={handleSessionNeedsPlan}
@@ -1294,8 +1293,8 @@ export default function DietPage() {
 
       {/* 底部固定 AI 分析按鈕（日常配餐 Tab 才顯示） */}
       {activeTab === 'daily' && (
-        <div className="fixed bottom-[60px] left-0 right-0 z-40 pointer-events-none">
-          <div className="max-w-[480px] mx-auto px-4 pb-3 pointer-events-auto">
+        <div className="fixed bottom-[60px] md:bottom-0 left-0 right-0 z-40 md:static md:mt-6 md:mb-2">
+          <div className="px-6 md:px-0 pb-3 md:pb-0">
             <button
               onClick={() => void handleAiAnalyze()}
               disabled={aiAnalyzing}

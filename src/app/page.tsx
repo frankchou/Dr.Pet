@@ -482,53 +482,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 4. 快速功能 */}
-            <h2 className="text-xl font-bold tracking-tight mb-4">快速功能</h2>
-            <div className="flex flex-col gap-4 mb-2">
-              {/* 毛孩成長分析卡 */}
-              <div className="bg-[#FEF1E2] rounded-[32px] p-6 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="absolute top-5 right-5 text-[#D98A53] opacity-30">
-                  <SvgSparkles size={72} />
-                </div>
-                <h3 className="font-bold text-xl mb-2 relative z-10 text-slate-900">毛孩成長分析</h3>
-                <p className="text-sm text-slate-700 font-medium mb-6 relative z-10 w-3/4">
-                  {currentPet && ageLabel
-                    ? (() => {
-                        const [y] = (ageLabel.match(/(\d+)歲/) ?? [])
-                        const years = y ? parseInt(y) : 0
-                        if (years < 1) return '一歲以下幼犬，建議提供高蛋白質成長配方。'
-                        if (years >= 7) return '老年犬建議低磷高消化率配方，定期監測腎功能。'
-                        return '成年犬維持均衡飲食，適量蛋白質與脂肪。'
-                      })()
-                    : '記錄日常飲食，讓 AI 追蹤毛孩健康趨勢。'
-                  }
-                </p>
-                <div className="flex flex-wrap items-center gap-2 relative z-10">
-                  <span className="bg-white/70 px-3 py-1.5 rounded-full text-xs font-bold text-slate-800 backdrop-blur-md shadow-sm border border-white/50">
-                    今日已記錄 {todayMealCount} 餐
-                  </span>
-                </div>
-              </div>
-
-              {/* 飲食紀錄按鈕 */}
-              <Link
-                href="/diary#diet-record"
-                className="w-full text-left bg-[#111111] rounded-[32px] p-5 flex items-center justify-between group hover:bg-black transition-colors shadow-lg shadow-black/10"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black shrink-0">
-                    <SvgPlus />
-                  </div>
-                  <div>
-                    <h4 className="text-white font-bold text-lg">飲食紀錄</h4>
-                    <p className="text-slate-400 text-sm font-medium">記錄今天的食物或換食</p>
-                  </div>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all shrink-0">
-                  <SvgArrowUpRight />
-                </div>
-              </Link>
-            </div>
           </div>
 
           {/* 3 + 4. 日程區塊 */}
@@ -617,9 +570,55 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 6. 營養綜合分析 */}
-            <IngredientAnalysis petId={currentPetId} />
+          </div>
 
+          {/* 快速功能 */}
+          <div className="flex flex-col gap-4">
+            <h2 className="text-xl font-bold tracking-tight">快速功能</h2>
+
+            {/* 毛孩成長分析卡 */}
+            <div className="bg-[#FEF1E2] rounded-[32px] p-6 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div className="absolute top-5 right-5 text-[#D98A53] opacity-30">
+                <SvgSparkles size={72} />
+              </div>
+              <h3 className="font-bold text-xl mb-2 relative z-10 text-slate-900">毛孩成長分析</h3>
+              <p className="text-sm text-slate-700 font-medium mb-6 relative z-10 w-3/4">
+                {currentPet && ageLabel
+                  ? (() => {
+                      const [y] = (ageLabel.match(/(\d+)歲/) ?? [])
+                      const years = y ? parseInt(y) : 0
+                      if (years < 1) return '一歲以下幼犬，建議提供高蛋白質成長配方。'
+                      if (years >= 7) return '老年犬建議低磷高消化率配方，定期監測腎功能。'
+                      return '成年犬維持均衡飲食，適量蛋白質與脂肪。'
+                    })()
+                  : '記錄日常飲食，讓 AI 追蹤毛孩健康趨勢。'
+                }
+              </p>
+              <div className="flex flex-wrap items-center gap-2 relative z-10">
+                <span className="bg-white/70 px-3 py-1.5 rounded-full text-xs font-bold text-slate-800 backdrop-blur-md shadow-sm border border-white/50">
+                  今日已記錄 {todayMealCount} 餐
+                </span>
+              </div>
+            </div>
+
+            {/* 飲食紀錄按鈕 */}
+            <Link
+              href="/diary#diet-record"
+              className="w-full text-left bg-[#111111] rounded-[32px] p-5 flex items-center justify-between group hover:bg-black transition-colors shadow-lg shadow-black/10"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black shrink-0">
+                  <SvgPlus />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-lg">飲食紀錄</h4>
+                  <p className="text-slate-400 text-sm font-medium">記錄今天的食物或換食</p>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all shrink-0">
+                <SvgArrowUpRight />
+              </div>
+            </Link>
           </div>
         </div>
       )}

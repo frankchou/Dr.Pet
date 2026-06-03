@@ -42,8 +42,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: '/nutrition',
+    label: '營養分析',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+        <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
+      </svg>
+    ),
+  },
+  {
     href: '/nutritionist',
-    label: '營養師',
+    label: 'AI諮詢',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
         <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />

@@ -9,8 +9,10 @@ import BottomNav from './BottomNav'
 const HEADER_META: Record<string, [string, string]> = {
   '/':             ['總覽',      '讓我們來看看今天的營養狀況吧'],
   '/diary':        ['日誌',      '記錄毛孩的每一天'],
+  '/diet':         ['飲食計畫',  '管理毛孩的每日配餐'],
   '/settings':     ['設定與檔案', '管理毛孩資料與紀錄參數'],
-  '/nutritionist': ['AI 營養師', '專屬毛孩的營養諮詢'],
+  '/nutritionist': ['AI 諮詢',  '與 AI 討論毛孩的健康問題'],
+  '/nutrition':    ['營養分析', '毛孩成分風險與營養報告'],
   '/news':         ['快訊',      '最新營養知識與通知'],
   '/scan':         ['即時分析',  '拍照分析食品成分'],
 }
