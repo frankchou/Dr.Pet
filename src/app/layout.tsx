@@ -8,8 +8,9 @@ export const metadata: Metadata = {
   title: 'PurePaw 無敏毛孩',
   description: '專屬台灣毛孩的 AI 寵物營養健康管理平台',
   icons: {
-    icon: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: '/app-logo.png',
+    apple: '/app-logo.png',
+    shortcut: '/app-logo.png',
   },
 }
 

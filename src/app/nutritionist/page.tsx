@@ -20,21 +20,8 @@ interface Message {
 
 function PurePawLogo({ width = 28, height = 28 }: { width?: number; height?: number }) {
   return (
-    <svg viewBox="0 0 512 512" width={width} height={height} aria-hidden="true">
-      <rect width="512" height="512" rx="115" fill="#FFE8D6" />
-      <g
-        transform="translate(100,110) scale(13)"
-        stroke="#111"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      >
-        <path d="M21 14.5a6 6 0 01-6 6H9a6 6 0 01-6-6V9a6 6 0 016-6h6a6 6 0 016 6v5.5z" />
-        <circle cx="9" cy="11" r="1.5" fill="#111" stroke="none" />
-        <circle cx="15" cy="11" r="1.5" fill="#111" stroke="none" />
-      </g>
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/app-logo.png" alt="PurePaw" width={width} height={height} className="rounded-xl object-cover" />
   )
 }
 
