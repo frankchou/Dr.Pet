@@ -82,9 +82,34 @@ function extractIngredientTexts(product: ProductData): string[] {
     texts.push(...allArrays)
   }
 
-  // 2. 原始文字：只在沒有結構化資料時才使用（避免「不含X」等否定句誤判）
+  // 2. 原始文字：只在沒有結構化資料時才使用
   if (texts.length === 0 && product.ingredientText) {
-    texts.push(product.ingredientText)
+    // 嘗試從 ingredientText 解析 JSON（處理 AI 回傳含 markdown code block 的情況）
+    const cleaned = product.ingredientText
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim()
+    try {
+      const json = JSON.parse(cleaned) as {
+        ingredients?: string[]
+        protein_sources?: string[]
+        additives?: string[]
+        functional_ingredients?: string[]
+      }
+      const allArrays = [
+        ...(json.ingredients || []),
+        ...(json.protein_sources || []),
+        ...(json.additives || []),
+        ...(json.functional_ingredients || []),
+      ]
+      if (allArrays.length > 0) {
+        texts.push(...allArrays)
+      } else {
+        texts.push(product.ingredientText)
+      }
+    } catch {
+      texts.push(product.ingredientText)
+    }
   }
 
   return texts

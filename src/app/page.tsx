@@ -1,493 +1,628 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { parseJson, productTypeLabel } from '@/lib/utils'
+import Image from 'next/image'
+import { parseJson, symptomTypeLabel } from '@/lib/utils'
+import IngredientAnalysis from '@/components/home/IngredientAnalysis'
+
+// ─── 型別 ────────────────────────────────────────────────────────────────────
 
 interface Pet {
   id: string
   name: string
   species: string
   breed?: string | null
-  gender?: string | null
+  sex: string
+  birthday?: string | null
   weight?: number | null
-  age?: number | null
+  isNeutered: boolean
   avatar?: string | null
   mainProblems?: string | null
   allergies?: string | null
 }
 
-interface PetProduct {
-  id: string
-  listType: string
-  createdAt: string
-  product: { id: string; type: string; name: string; brand?: string | null }
+// ─── 小工具 ──────────────────────────────────────────────────────────────────
+
+/** 計算年齡字串，如 "3歲2個月" 或 "5歲" */
+function calcAge(birthday: string | null | undefined): string | null {
+  if (!birthday) return null
+  const birth = new Date(birthday)
+  if (isNaN(birth.getTime())) return null
+  const now = new Date()
+  let years = now.getFullYear() - birth.getFullYear()
+  let months = now.getMonth() - birth.getMonth()
+  if (months < 0) { years -= 1; months += 12 }
+  if (years <= 0 && months <= 0) return '未滿1個月'
+  if (months === 0) return `${years}歲`
+  if (years === 0) return `${months}個月`
+  return `${years}歲${months}個月`
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  feed: '飼', can: '罐', snack: '零', supplement: '保', dental: '潔', shampoo: '浴', other: '他',
+/** 性別標籤 */
+function genderLabel(sex: string, isNeutered: boolean): string {
+  const isMale = sex === 'male' || sex === 'M' || sex === '公'
+  if (isNeutered) return isMale ? '♂ 已結紮' : '♀ 已結紮'
+  return isMale ? '♂' : '♀'
 }
-const TYPE_BG: Record<string, string> = {
-  feed: 'bg-[#F5EDE6]', can: 'bg-[#FDF3E7]', snack: 'bg-[#FFF8F0]',
-  supplement: 'bg-[#EDF5ED]', dental: 'bg-[#EDF3F5]', shampoo: 'bg-[#F5EDF5]', other: 'bg-[#F0F0F0]',
+
+// ─── Inline SVG 圖示（strokeWidth 2.5，lucide 風格）──────────────────────────
+
+function SvgActivity() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )
+}
+
+function SvgSparkles({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <path d="M12 3l1.09 3.31L16.5 7.5l-3.41 1.09L12 12l-1.09-3.41L7.5 7.5l3.41-1.09z" />
+      <path d="M5 3l.54 1.66L7.2 5.5l-1.66.54L5 7.7l-.54-1.66L2.8 5.5l1.66-.54z" />
+      <path d="M19 12l.54 1.66 1.66.54-1.66.54L19 16.4l-.54-1.66-1.66-.54 1.66-.54z" />
+    </svg>
+  )
+}
+
+function SvgPlus() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" width={22} height={22}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  )
+}
+
+function SvgArrowUpRight() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+      <line x1="7" y1="17" x2="17" y2="7" />
+      <polyline points="7 7 17 7 17 17" />
+    </svg>
+  )
+}
+
+function SvgCalendar({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+
+function SvgDroplets({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.09 3 12.25c0 2.22 1.8 4.05 4 4.05z" />
+      <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97" />
+    </svg>
+  )
+}
+
+function SvgCake({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
+      <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" />
+      <path d="M2 21h20" />
+      <path d="M7 8v2" /><path d="M12 8v2" /><path d="M17 8v2" />
+      <path d="M7 4h.01" /><path d="M12 4h.01" /><path d="M17 4h.01" />
+    </svg>
+  )
+}
+
+function SvgHeartPulse() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+      <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
+    </svg>
+  )
+}
+
+function SvgHeart({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  )
+}
+
+function SvgZap({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  )
+}
+
+// ─── 子元件 ──────────────────────────────────────────────────────────────────
+
+function IconChip({ icon, bgColor }: { icon: React.ReactNode; bgColor: string }) {
+  return (
+    <div
+      className="w-14 h-14 rounded-[20px] flex items-center justify-center shrink-0 shadow-sm border border-slate-900/5 text-[#111111]"
+      style={{ backgroundColor: bgColor }}
+    >
+      {icon}
+    </div>
+  )
+}
+
+function HealthTag({ children, accent = false }: { children: React.ReactNode; accent?: boolean }) {
+  if (accent) {
+    return (
+      <span className="bg-[#D98A53] text-white px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 shadow-sm">
+        <SvgSparkles size={10} />
+        {children}
+      </span>
+    )
+  }
+  return (
+    <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-[11px] font-bold text-slate-600">
+      {children}
+    </span>
+  )
+}
+
+function HealthMetric({ icon, bg, label, value }: { icon: React.ReactNode; bg: string; label: string; value?: string | null }) {
+  return (
+    <div className="bg-white border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[#111111]" style={{ backgroundColor: bg }}>
+        {icon}
+      </div>
+      <p className={`text-sm font-bold ${value ? 'text-slate-900' : 'text-slate-400'}`}>{value ?? '未記錄'}</p>
+      <p className="text-[10px] font-bold text-slate-400 leading-tight">{label}</p>
+    </div>
+  )
+}
+
+// ─── 頁面元件 ────────────────────────────────────────────────────────────────
+
+interface HealthMetricRecord {
+  bodyScore?: number | null
+  vitality?: string | null
+  waterIntake?: string | null
 }
 
 export default function HomePage() {
   const [pets, setPets] = useState<Pet[]>([])
-  const [currentPetId, setCurrentPetId] = useState('')
-  const [petProducts, setPetProducts] = useState<PetProduct[]>([])
-  const [productTab, setProductTab] = useState<'fixed' | 'trial'>('fixed')
-  const [nickname, setNickname] = useState('飼主')
+  const [currentPetId, setCurrentPetId] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  const [deletingPet, setDeletingPet] = useState(false)
-  const [heroView, setHeroView] = useState<'compact' | 'large'>('compact')
-  const [todayStr, setTodayStr] = useState('')
+  const [scheduleTab, setScheduleTab] = useState<'medical' | 'grooming' | 'holiday'>('medical')
+  const [healthMetric, setHealthMetric] = useState<HealthMetricRecord | null>(null)
+  const [todayMealCount, setTodayMealCount] = useState<number>(0)
 
-  const [showEditOwner, setShowEditOwner] = useState(false)
-  const [editNickname, setEditNickname] = useState('')
-
-  const touchStartX = useRef(0)
-  const touchStartY = useRef(0)
-
-  useEffect(() => {
-    const stored = localStorage.getItem('drpet_nickname')
-    if (stored) setNickname(stored)
-  }, [])
-
-  useEffect(() => {
-    const now = new Date()
-    setTodayStr(`今天 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)
-  }, [])
-
+  // 載入寵物列表
   useEffect(() => {
     fetch('/api/pets')
       .then(r => r.json())
       .then((data: Pet[]) => {
-        setPets(data)
+        setPets(Array.isArray(data) ? data : [])
         const stored = localStorage.getItem('drpet_currentPetId')
-        const first = stored && data.find(p => p.id === stored) ? stored : data[0]?.id
-        if (first) setCurrentPetId(first)
+        const match = stored && data.find(p => p.id === stored)
+        const first = match ? stored : data[0]?.id ?? ''
+        setCurrentPetId(first)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const loadProducts = useCallback(async (petId: string) => {
-    if (!petId) return
-    try {
-      const res = await fetch(`/api/pet-products?petId=${petId}`)
-      const data = await res.json()
-      setPetProducts(Array.isArray(data) ? data : [])
-    } catch { setPetProducts([]) }
+  // 載入健康指標 + 今日餐數
+  useEffect(() => {
+    if (!currentPetId) return
+    const today = new Date().toISOString().split('T')[0]
+    fetch(`/api/health-metrics?petId=${currentPetId}&date=${today}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: HealthMetricRecord | null) => setHealthMetric(d))
+      .catch(() => {})
+    fetch(`/api/usages?petId=${currentPetId}&date=${today}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((d: unknown[]) => setTodayMealCount(Array.isArray(d) ? d.length : 0))
+      .catch(() => {})
+  }, [currentPetId])
+
+  // 監聽 localStorage drpet_currentPetId 的變化（header 切換寵物時）
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'drpet_currentPetId' && e.newValue) {
+        setCurrentPetId(e.newValue)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   useEffect(() => {
     if (currentPetId) {
       localStorage.setItem('drpet_currentPetId', currentPetId)
-      loadProducts(currentPetId)
     }
-  }, [currentPetId, loadProducts])
+  }, [currentPetId])
 
-  const currentPetIndex = pets.findIndex(p => p.id === currentPetId)
-  const currentPet = pets[currentPetIndex] ?? null
+  const currentPet = pets.find(p => p.id === currentPetId) ?? null
 
-  const goPrev = () => {
-    if (pets.length <= 1) return
-    setCurrentPetId(pets[(currentPetIndex - 1 + pets.length) % pets.length].id)
-  }
-  const goNext = () => {
-    if (pets.length <= 1) return
-    setCurrentPetId(pets[(currentPetIndex + 1) % pets.length].id)
-  }
+  const allergies = parseJson<string[]>(currentPet?.allergies ?? '[]', [])
+  const mainProblems = parseJson<string[]>(currentPet?.mainProblems ?? '[]', [])
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-    touchStartY.current = e.touches[0].clientY
-  }
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const dx = touchStartX.current - e.changedTouches[0].clientX
-    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY)
-    if (Math.abs(dx) > 50 && dy < 60) dx > 0 ? goNext() : goPrev()
-  }
+  // 生日 MM-DD 格式
+  const birthdayMMDD = currentPet?.birthday
+    ? currentPet.birthday.slice(5, 10)
+    : null
 
-  const handleDeletePet = async () => {
-    if (!currentPet) return
-    if (!confirm(`確定要刪除「${currentPet.name}」的所有資料？此操作無法復原。`)) return
-    setDeletingPet(true)
-    try {
-      await fetch(`/api/pets/${currentPetId}`, { method: 'DELETE' })
-      const newPets = pets.filter(p => p.id !== currentPetId)
-      setPets(newPets)
-      setCurrentPetId(newPets[0]?.id || '')
-      setPetProducts([])
-    } catch { /* ignore */ }
-    finally { setDeletingPet(false) }
-  }
+  const ageLabel = currentPet?.birthday ? calcAge(currentPet.birthday) : null
 
-  const mainProblems = parseJson<string[]>(currentPet?.mainProblems || '[]', [])
-  const allergies    = parseJson<string[]>(currentPet?.allergies   || '[]', [])
-  const allTags      = [...mainProblems, ...allergies]
-  const fixedProducts   = petProducts.filter(p => p.listType === 'fixed')
-  const trialProducts   = petProducts.filter(p => p.listType === 'trial')
-  const displayProducts = productTab === 'fixed' ? fixedProducts : trialProducts
-
-  const saveOwnerName = () => {
-    const name = editNickname.trim()
-    if (!name) return
-    setNickname(name)
-    localStorage.setItem('drpet_nickname', name)
-    setShowEditOwner(false)
-  }
-
-  // ── Avatar element (reused in both layouts) ─────────────────────────────────
-  const AvatarEl = ({ size }: { size: 'sm' | 'lg' }) => {
-    const dim = size === 'sm' ? 'w-20 h-20 rounded-2xl' : 'w-28 h-28 rounded-3xl'
-    const iconSize = size === 'sm' ? 'w-9 h-9' : 'w-12 h-12'
-    const badgePos = size === 'sm' ? '-bottom-2 -right-2 w-7 h-7' : '-bottom-2 -right-2 w-8 h-8'
-    return (
-      <div className={`${dim} bg-white shadow-sm flex items-center justify-center relative shrink-0`}>
-        {currentPet?.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={currentPet.avatar} alt={currentPet?.name} className="w-full h-full object-cover rounded-[inherit]" />
-        ) : (
-          <svg viewBox="0 0 24 24" fill="#C4714A" className={`${iconSize} opacity-70`}>
-            <ellipse cx="12" cy="17" rx="5" ry="3.5" />
-            <circle cx="8.5" cy="11" r="1.8" />
-            <circle cx="15.5" cy="11" r="1.8" />
-            <circle cx="5.5" cy="13.5" r="1.4" />
-            <circle cx="18.5" cy="13.5" r="1.4" />
-          </svg>
-        )}
-        <div className={`absolute ${badgePos} rounded-full bg-[#C4714A] flex items-center justify-center shadow-sm`}>
-          <svg viewBox="0 0 24 24" fill="white" className="w-3.5 h-3.5">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-        </div>
-      </div>
-    )
-  }
+  // 計算下次生日距今幾天（複用 birthdayMMDD 避免 ISO 格式解析問題）
+  const daysUntilBirthday = (() => {
+    if (!birthdayMMDD) return null
+    const [mm, dd] = birthdayMMDD.split('-').map(Number)
+    if (isNaN(mm) || isNaN(dd)) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    let next = new Date(today.getFullYear(), mm - 1, dd)
+    if (next.getTime() <= today.getTime()) next = new Date(today.getFullYear() + 1, mm - 1, dd)
+    return Math.ceil((next.getTime() - today.getTime()) / 86400000)
+  })()
+  const genderBadge = currentPet ? genderLabel(currentPet.sex, currentPet.isNeutered) : null
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] pb-24">
+    <div
+      className="px-6 md:px-8 min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 pt-2 md:pt-4 max-w-2xl mx-auto w-full"
+      style={{ fontFamily: 'var(--pp-font)' }}
+    >
 
-      {/* ── Header ── */}
-      <div className="bg-[#FAF7F2] px-4 pt-12 pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-[#2C1810]">毛孩檔案</h1>
-            <p className="text-xs text-[#8B7355] mt-0.5">上次更新：{todayStr}</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-[#F5EDE6] flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="#C4714A" className="w-6 h-6">
-              <ellipse cx="12" cy="17" rx="5" ry="3.5" />
-              <circle cx="8.5" cy="11" r="1.8" />
-              <circle cx="15.5" cy="11" r="1.8" />
-              <circle cx="5.5" cy="13.5" r="1.4" />
-              <circle cx="18.5" cy="13.5" r="1.4" />
+      {/* 無寵物引導（取代整個 hero + 主體） */}
+      {!loading && !currentPet && (
+        <div className="flex flex-col items-center justify-center gap-6 py-24 flex-1">
+          <div className="w-20 h-20 rounded-3xl bg-[#FFE8D6] flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D98A53" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={36} height={36}>
+              <path d="M10.5 2.5C10.5 2.5 9 4 6.5 4S3 2.5 3 2.5A9.5 9.5 0 0 0 3 9c0 5.25 9 11 9 11s9-5.75 9-11a9.5 9.5 0 0 0 0-6.5S19 4 16.5 4 13.5 2.5 13.5 2.5" />
+              <circle cx="12" cy="10" r="2.5" />
             </svg>
           </div>
-        </div>
-      </div>
-
-      <div className="px-4 space-y-3 pt-2">
-
-        {/* ── Owner card ── */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#C4714A] flex items-center justify-center text-white text-sm font-bold shrink-0">
-            {nickname.slice(0, 1)}
+          <div className="text-center">
+            <p className="text-lg font-bold text-[#111111] mb-1">還沒有毛孩檔案</p>
+            <p className="text-sm text-slate-400 font-medium">建立第一個毛孩檔案，開始記錄健康！</p>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-[#8B7355]">Hi, 歡迎回來</p>
-            <p className="text-sm font-semibold text-[#2C1810] truncate">{nickname}</p>
-          </div>
-          {/* Edit nickname */}
-          <button onClick={() => { setEditNickname(nickname); setShowEditOwner(true) }}
-            className="w-7 h-7 flex items-center justify-center text-[#8B7355] hover:text-[#C4714A]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-          </button>
-          {/* Toggle hero view (compact ↔ large) */}
-          <button onClick={() => setHeroView(v => v === 'compact' ? 'large' : 'compact')}
-            className="w-7 h-7 flex items-center justify-center text-[#8B7355] hover:text-[#C4714A]">
-            {heroView === 'compact' ? (
-              /* Grid icon → indicates compact mode */
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-            ) : (
-              /* Detail icon → indicates large mode */
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-                <rect x="3" y="4" width="6" height="6" rx="1" />
-                <line x1="12" y1="7" x2="21" y2="7" strokeLinecap="round" />
-                <rect x="3" y="14" width="6" height="6" rx="1" />
-                <line x1="12" y1="17" x2="21" y2="17" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {/* ── Pet hero card ── */}
-        {loading ? (
-          <div className="bg-white rounded-3xl shadow-sm h-52 animate-pulse" />
-        ) : !currentPet ? (
-          <div className="bg-white rounded-3xl shadow-sm py-12 flex flex-col items-center gap-3">
-            <div className="text-5xl">🐾</div>
-            <p className="text-[#8B7355] text-sm">先建立您的毛孩檔案</p>
-            <Link href="/pet/new"
-              className="px-6 py-2.5 bg-[#C4714A] text-white rounded-2xl font-medium text-sm">
-              建立毛孩檔案
-            </Link>
-          </div>
-        ) : (
-          <div className="relative">
-
-            {/* Right: Next pet */}
-            {pets.length > 1 && (
-              <button onClick={goNext}
-                className="absolute right-0 top-0 bottom-0 w-10 z-10 flex items-center justify-center group">
-                <div className="w-7 h-14 rounded-l-2xl bg-[#EDE0D8]/60 group-active:bg-[#C4714A]/20 flex items-center justify-center transition-colors">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={2} className="w-4 h-4">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </button>
-            )}
-
-            {/* Hero card */}
-            <div className={`bg-white rounded-3xl shadow-sm overflow-hidden ${pets.length > 1 ? 'mr-9' : ''}`}
-              onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-
-              {heroView === 'compact' ? (
-                /* ── Compact: avatar left, info right ── */
-                <div className="bg-[#F5EDE6] px-4 py-5 flex items-center gap-4 relative">
-                  <Link href={`/pet/${currentPetId}`}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-[#8B7355]">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </Link>
-                  <AvatarEl size="sm" />
-                  <div className="flex-1 min-w-0 pr-8">
-                    {/* Name + gender + delete inline */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h2 className="text-xl font-bold text-[#2C1810]">{currentPet.name}</h2>
-                      {currentPet.gender && (
-                        <span className="text-xs text-[#C4714A] border border-[#C4714A]/40 rounded-full px-2 py-0.5 leading-none shrink-0">
-                          {currentPet.gender}
-                        </span>
-                      )}
-                      <button onClick={handleDeletePet} disabled={deletingPet}
-                        className="shrink-0 w-6 h-6 flex items-center justify-center text-[#C4714A]/40 hover:text-red-400 active:text-red-500 disabled:opacity-40 transition-colors">
-                        {deletingPet ? (
-                          <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                            <path d="M10 11v6"/><path d="M14 11v6"/>
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-sm text-[#8B7355] mt-0.5">
-                      {currentPet.breed || currentPet.species}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-[#8B7355] mt-0.5">
-                      {currentPet.weight && <span>{currentPet.weight} 公斤</span>}
-                      {currentPet.weight && currentPet.age && <span className="text-[#C4714A]/40">｜</span>}
-                      {currentPet.age && <span>{currentPet.age} 歲</span>}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* ── Large: avatar centered, tall ── */
-                <div className="bg-[#F5EDE6] px-4 pt-8 pb-5 flex flex-col items-center relative">
-                  <Link href={`/pet/${currentPetId}`}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-[#8B7355]">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </Link>
-                  <AvatarEl size="lg" />
-                  {/* Name + gender + delete inline */}
-                  <div className="flex items-center gap-1.5 mt-4 flex-wrap justify-center">
-                    <h2 className="text-2xl font-bold text-[#2C1810]">{currentPet.name}</h2>
-                    {currentPet.gender && (
-                      <span className="text-xs text-[#C4714A] border border-[#C4714A]/40 rounded-full px-2 py-0.5 leading-none shrink-0">
-                        {currentPet.gender}
-                      </span>
-                    )}
-                    <button onClick={handleDeletePet} disabled={deletingPet}
-                      className="shrink-0 w-6 h-6 flex items-center justify-center text-[#C4714A]/40 hover:text-red-400 active:text-red-500 disabled:opacity-40 transition-colors">
-                      {deletingPet ? (
-                        <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5">
-                          <polyline points="3 6 5 6 21 6"/>
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                          <path d="M10 11v6"/><path d="M14 11v6"/>
-                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-sm text-[#8B7355] mt-0.5">
-                    {currentPet.breed || currentPet.species}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-[#8B7355] mt-0.5">
-                    {currentPet.weight && <span>{currentPet.weight} 公斤</span>}
-                    {currentPet.weight && currentPet.age && <span className="text-[#C4714A]/40">｜</span>}
-                    {currentPet.age && <span>{currentPet.age} 歲</span>}
-                  </div>
-                </div>
-              )}
-
-              {/* Health tags (same for both views) */}
-              <div className="px-4 py-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {allTags.map((tag, i) => (
-                    <span key={i} className="text-xs px-2.5 py-1 rounded-full border border-[#C4714A]/40 text-[#C4714A] bg-[#FDF8F5]">
-                      # {tag}
-                    </span>
-                  ))}
-                  {[80, 48, 64, 56, 40].map((w, i) => (
-                    <span key={`sk-${i}`} className="h-6 rounded-full bg-[#EDE0D8]/30" style={{ width: w }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Pet index dots */}
-            {pets.length > 1 && (
-              <div className="flex gap-1.5 justify-center pt-2.5">
-                {pets.map((p, i) => (
-                  <button key={p.id} onClick={() => setCurrentPetId(p.id)}
-                    className={`rounded-full transition-all ${
-                      i === currentPetIndex ? 'w-4 h-1.5 bg-[#C4714A]' : 'w-1.5 h-1.5 bg-[#C4714A]/30'
-                    }`} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── 健康狀況 ── */}
-        {!loading && (
-          <div>
-            <p className="text-sm font-bold text-[#2C1810] mb-2">健康狀況</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { icon: <svg viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={1.8} className="w-5 h-5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, label: '體態評分' },
-                { icon: <svg viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={1.8} className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: '活力指數' },
-                { icon: <svg viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={1.8} className="w-5 h-5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>, label: '水分攝取' },
-              ].map((card, i) => (
-                <div key={i} className="bg-white rounded-2xl shadow-sm p-3 flex flex-col items-center gap-1.5 text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#F5EDE6] flex items-center justify-center">{card.icon}</div>
-                  <p className="text-sm font-bold text-[#2C1810]">未記錄</p>
-                  <p className="text-[10px] text-[#8B7355] leading-tight">{card.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── 使用產品 ── */}
-        {!loading && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-[#2C1810]">使用產品</p>
-              <div className="flex rounded-full bg-[#F0EAE4] p-0.5">
-                {(['fixed', 'trial'] as const).map(t => (
-                  <button key={t} onClick={() => setProductTab(t)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-colors ${
-                      productTab === t ? 'bg-white text-[#C4714A] shadow-sm' : 'text-[#8B7355]'
-                    }`}>
-                    {t === 'fixed' ? '固定' : '試用'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              {displayProducts.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-sm py-8 text-center text-[#8B7355] text-sm">
-                  尚無{productTab === 'fixed' ? '固定' : '試用'}產品
-                </div>
-              ) : displayProducts.map(pp => (
-                <Link key={pp.id} href="/products"
-                  className="bg-white rounded-2xl shadow-sm p-3.5 flex items-center gap-3 active:opacity-80 block">
-                  <div className={`w-10 h-10 rounded-xl ${TYPE_BG[pp.product.type] || 'bg-[#F5EDE6]'} flex items-center justify-center shrink-0`}>
-                    <span className="text-xs font-bold text-[#C4714A]">{TYPE_LABEL[pp.product.type] || '他'}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#2C1810] truncate">{pp.product.name}</p>
-                    <p className="text-[10px] text-[#8B7355]">{productTypeLabel(pp.product.type)}</p>
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    pp.listType === 'fixed' ? 'bg-[#F5EDE6] text-[#C4714A]' : 'bg-[#EDF5ED] text-[#4CAF50] border border-[#4CAF50]/30'
-                  }`}>
-                    {pp.listType === 'fixed' ? '固定' : '試用'}
-                  </span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="#C0B0A8" strokeWidth={2} className="w-4 h-4 shrink-0">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Community teaser ── */}
-        {!loading && (
-          <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#EDF5ED] flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth={1.8} className="w-5 h-5">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-semibold text-[#2C1810]">飼主社群討論板</p>
-                <span className="text-[10px] px-1.5 py-0.5 bg-[#FDF3E7] text-[#C4714A] rounded font-medium">即將推出</span>
-              </div>
-              <p className="text-[10px] text-[#8B7355]">與其他毛孩家長交流分享照護心得</p>
-            </div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="#C0B0A8" strokeWidth={2} className="w-4 h-4 shrink-0">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </div>
-        )}
-
-      </div>
-
-      {/* ── Edit owner name modal ── */}
-      {showEditOwner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
-          onClick={() => setShowEditOwner(false)}>
-          <div className="w-full max-w-[360px] bg-white rounded-3xl p-6 shadow-xl"
-            onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-[#2C1810] mb-1">編輯飼主名稱</h3>
-            <p className="text-xs text-[#8B7355] mb-4">這個名稱會顯示在毛孩檔案頁面上方</p>
-            <input value={editNickname} onChange={e => setEditNickname(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveOwnerName()}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#C4714A]/30 mb-4"
-              autoFocus />
-            <div className="flex gap-2">
-              <button onClick={() => setShowEditOwner(false)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-[#8B7355] text-sm font-medium">取消</button>
-              <button onClick={saveOwnerName}
-                className="flex-1 py-3 rounded-xl bg-[#C4714A] text-white text-sm font-medium active:opacity-90">儲存</button>
-            </div>
-          </div>
+          <Link
+            href="/settings"
+            className="bg-[#111111] text-white font-bold rounded-2xl px-8 py-4 hover:bg-black transition-colors shadow-lg shadow-black/10 text-sm"
+          >
+            建立毛孩檔案
+          </Link>
         </div>
       )}
 
+      {/* 1. Pet Profile Hero（有寵物才渲染） */}
+      {(loading || currentPet) && (
+      <div className="relative shrink-0 -mx-6 md:-mx-8 -mt-28 md:-mt-4 mb-8 h-[560px] md:h-[700px] overflow-hidden flex flex-col justify-end md:rounded-t-[24px]">
+        {loading ? (
+          <div className="absolute inset-0 bg-[#FFE8D6]/50 animate-pulse" />
+        ) : currentPet ? (
+          <div className="absolute inset-0 z-0">
+            {currentPet.avatar ? (
+              <Image
+                src={currentPet.avatar}
+                alt={currentPet.name}
+                fill
+                className="object-cover object-top scale-125 origin-top"
+                unoptimized
+              />
+            ) : (
+              <div className="w-full h-full bg-[#FFE8D6] flex items-end justify-center pb-28">
+                {/* 無頭像顯示名字首字 */}
+                <span className="text-[120px] font-bold text-[#D98A53]/30 select-none leading-none">
+                  {currentPet.name.charAt(0)}
+                </span>
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#F4F7FB] via-[#F4F7FB]/80 to-transparent" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-[#FFE8D6]" />
+        )}
+
+        {/* Hero 文字區 */}
+        <div className="relative z-10 flex flex-col items-center pb-6 md:pb-10 px-4">
+          {loading ? (
+            <div className="w-fit flex flex-col items-start gap-3">
+              <div className="h-8 w-32 bg-[#D98A53]/20 rounded-xl animate-pulse" />
+              <div className="flex gap-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-9 w-20 bg-[#D98A53]/20 rounded-full animate-pulse" />
+                ))}
+              </div>
+            </div>
+          ) : currentPet ? (
+            <div className="w-fit flex flex-col items-start">
+              <h1 className="text-2xl md:text-3xl font-bold mb-3 text-[#3A332C] tracking-widest drop-shadow-sm">
+                {currentPet.name}
+              </h1>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  currentPet.breed || currentPet.species,
+                  genderBadge,
+                  ageLabel,
+                ]
+                  .filter(Boolean)
+                  .map((tag, i) => (
+                    <span
+                      key={i}
+                      className="bg-[#FAF8F5]/80 backdrop-blur-md px-5 py-2 rounded-full text-sm font-bold text-[#3A332C] shadow-sm border border-white/40"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      )}
+
+      {/* 主體內容 */}
+      {(loading || currentPet) && (
+        <div className="flex flex-col gap-8 pb-8">
+
+          {/* 2. 健康檔案概覽 */}
+          <div className="flex flex-col">
+            <div className="flex items-end justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
+                  <SvgActivity />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">健康檔案概覽</h2>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 mb-10">
+              {/* 飲食需知 */}
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <IconChip bgColor="#FEF1E2" icon={
+                  <svg viewBox="0 0 24 24" fill="currentColor" width={24} height={24}>
+                    <ellipse cx="5" cy="12" rx="3.8" ry="2.6"/>
+                    <ellipse cx="12" cy="12" rx="3.8" ry="2.6"/>
+                    <ellipse cx="19" cy="12" rx="3.8" ry="2.6"/>
+                  </svg>
+                } />
+                <div>
+                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">飲食需知</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {loading ? (
+                      <div className="h-6 w-24 bg-slate-100 rounded-full animate-pulse" />
+                    ) : allergies.length === 0 ? (
+                      <span className="text-slate-400 text-sm">尚未記錄</span>
+                    ) : (
+                      allergies.map((a, i) => (
+                        <HealthTag key={i} accent={i === 0}>{a}</HealthTag>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 確診疾病 */}
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <IconChip bgColor="#FDE2EC" icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={24} height={24}>
+                    <rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><line x1="12" y1="11" x2="12" y2="15"/><line x1="10" y1="13" x2="14" y2="13"/>
+                  </svg>
+                } />
+                <div>
+                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">確診疾病</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {loading ? (
+                      <div className="h-6 w-24 bg-slate-100 rounded-full animate-pulse" />
+                    ) : mainProblems.length === 0 ? (
+                      <span className="text-slate-400 text-sm">尚未記錄</span>
+                    ) : (
+                      mainProblems.slice(0, 3).map((p, i) => (
+                        <HealthTag key={i}>{symptomTypeLabel(p)}</HealthTag>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 日常症狀 */}
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                <IconChip bgColor="#EAF5ED" icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={24} height={24}>
+                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                    <path d="m8.5 8.5 7 7"/>
+                  </svg>
+                } />
+                <div>
+                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">日常症狀</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {loading ? (
+                      <div className="h-6 w-24 bg-slate-100 rounded-full animate-pulse" />
+                    ) : mainProblems.length === 0 ? (
+                      <span className="text-slate-400 text-sm">尚未記錄</span>
+                    ) : (
+                      mainProblems.map((p, i) => (
+                        <HealthTag key={i}>{symptomTypeLabel(p)}</HealthTag>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. 快速功能 */}
+            <h2 className="text-xl font-bold tracking-tight mb-4">快速功能</h2>
+            <div className="flex flex-col gap-4 mb-2">
+              {/* 毛孩成長分析卡 */}
+              <div className="bg-[#FEF1E2] rounded-[32px] p-6 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="absolute top-5 right-5 text-[#D98A53] opacity-30">
+                  <SvgSparkles size={72} />
+                </div>
+                <h3 className="font-bold text-xl mb-2 relative z-10 text-slate-900">毛孩成長分析</h3>
+                <p className="text-sm text-slate-700 font-medium mb-6 relative z-10 w-3/4">
+                  {currentPet && ageLabel
+                    ? (() => {
+                        const [y] = (ageLabel.match(/(\d+)歲/) ?? [])
+                        const years = y ? parseInt(y) : 0
+                        if (years < 1) return '一歲以下幼犬，建議提供高蛋白質成長配方。'
+                        if (years >= 7) return '老年犬建議低磷高消化率配方，定期監測腎功能。'
+                        return '成年犬維持均衡飲食，適量蛋白質與脂肪。'
+                      })()
+                    : '記錄日常飲食，讓 AI 追蹤毛孩健康趨勢。'
+                  }
+                </p>
+                <div className="flex flex-wrap items-center gap-2 relative z-10">
+                  <span className="bg-white/70 px-3 py-1.5 rounded-full text-xs font-bold text-slate-800 backdrop-blur-md shadow-sm border border-white/50">
+                    今日已記錄 {todayMealCount} 餐
+                  </span>
+                </div>
+              </div>
+
+              {/* 飲食紀錄按鈕 */}
+              <Link
+                href="/diary#diet-record"
+                className="w-full text-left bg-[#111111] rounded-[32px] p-5 flex items-center justify-between group hover:bg-black transition-colors shadow-lg shadow-black/10"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black shrink-0">
+                    <SvgPlus />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-lg">飲食紀錄</h4>
+                    <p className="text-slate-400 text-sm font-medium">記錄今天的食物或換食</p>
+                  </div>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all shrink-0">
+                  <SvgArrowUpRight />
+                </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* 4 + 5. 日程區塊 */}
+          <div className="w-full flex flex-col">
+
+            {/* 4. 重要日程 */}
+            <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-8 lg:mb-10">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-700">
+                  <SvgSparkles size={16} />
+                </div>
+                <h3 className="font-bold text-slate-800">重要日程</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#D98A53]/50 transition-colors cursor-pointer bg-white">
+                  <SvgCalendar size={24} />
+                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">年度疫苗</span>
+                  <span className="text-sm font-bold text-slate-400">--</span>
+                </div>
+                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#5C946E]/50 transition-colors cursor-pointer bg-white">
+                  <SvgDroplets size={24} />
+                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">體外驅蟲</span>
+                  <span className="text-sm font-bold text-slate-400">--</span>
+                </div>
+                <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#F391B3]/50 transition-colors cursor-pointer bg-white">
+                  <SvgCake size={24} />
+                  <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">生日</span>
+                  <span className="text-sm font-bold text-slate-700">
+                    {birthdayMMDD ?? '--'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. 未來日程表 */}
+            <div className="flex items-end justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
+                  <SvgCalendar size={16} />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">未來日程表</h2>
+              </div>
+            </div>
+
+            <div className="flex bg-slate-100 p-1.5 rounded-full mb-6">
+              {(
+                [
+                  { key: 'medical', label: '醫療' },
+                  { key: 'grooming', label: '美容' },
+                  { key: 'holiday', label: '節日' },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setScheduleTab(key)}
+                  className={`flex-1 py-2 rounded-full text-sm font-bold transition-all ${
+                    scheduleTab === key
+                      ? 'bg-[#111111] text-white shadow-sm'
+                      : 'text-slate-500 hover:text-black'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* 節日 tab：顯示生日 */}
+            {scheduleTab === 'holiday' && (
+              <>
+                {birthdayMMDD ? (
+                  <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#FEF1E2] flex items-center justify-center text-2xl shrink-0">🎂</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900">{currentPet?.name} 的生日</p>
+                      <p className="text-sm font-bold text-slate-400">{birthdayMMDD.replace('-', '/')} · {daysUntilBirthday === 0 ? '🎉 今天就是生日！' : `還有 ${daysUntilBirthday} 天`}</p>
+                    </div>
+                    <span className="text-xs font-bold text-[#D98A53] bg-[#FEF1E2] px-3 py-1.5 rounded-full shrink-0">節日</span>
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-8 shadow-sm flex flex-col items-center justify-center text-center gap-2">
+                    <SvgCalendar size={32} />
+                    <p className="text-slate-400 font-bold text-sm">尚無節日記錄</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 醫療 / 美容 tab：暫無資料 */}
+            {(scheduleTab === 'medical' || scheduleTab === 'grooming') && (
+              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-8 shadow-sm flex flex-col items-center justify-center text-center gap-2">
+                <SvgCalendar size={32} />
+                <p className="text-slate-400 font-bold text-sm">尚無日程記錄</p>
+              </div>
+            )}
+
+            {/* 6. 健康指標 */}
+            <div className="flex items-center gap-2 mt-10 mb-4">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
+                <SvgHeartPulse />
+              </div>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">健康指標</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <HealthMetric
+                icon={<SvgHeart size={18} />} bg="#FDE2EC" label="體態評分"
+                value={healthMetric?.bodyScore ? `${healthMetric.bodyScore}/9` : null}
+              />
+              <HealthMetric
+                icon={<SvgZap size={18} />} bg="#FEF1E2" label="活力指數"
+                value={healthMetric?.vitality === 'low' ? '低落' : healthMetric?.vitality === 'medium' ? '正常' : healthMetric?.vitality === 'high' ? '活躍' : null}
+              />
+              <HealthMetric
+                icon={<SvgDroplets size={18} />} bg="#EDF3FB" label="水分攝取"
+                value={healthMetric?.waterIntake === 'low' ? '偏少' : healthMetric?.waterIntake === 'medium' ? '正常' : healthMetric?.waterIntake === 'high' ? '偏多' : null}
+              />
+            </div>
+
+            {/* 7. 營養綜合分析 */}
+            <IngredientAnalysis petId={currentPetId} />
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }

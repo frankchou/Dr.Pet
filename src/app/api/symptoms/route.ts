@@ -26,8 +26,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { petId, symptomType, severity, side, notes, photos } = body
+    let body: Record<string, unknown>
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: '請求格式錯誤：body 必須為 JSON' }, { status: 400 })
+    }
+    const { petId, symptomType, severity, side, notes, photos } = body as {
+      petId?: string; symptomType?: string; severity?: number
+      side?: string; notes?: string; photos?: string[]
+    }
 
     if (!petId || !symptomType || severity === undefined) {
       return NextResponse.json(
@@ -40,7 +48,7 @@ export async function POST(request: NextRequest) {
       data: {
         petId,
         symptomType,
-        severity: parseInt(severity),
+        severity: parseInt(String(severity)),
         side: side || null,
         notes: notes || null,
         photos: JSON.stringify(photos || []),

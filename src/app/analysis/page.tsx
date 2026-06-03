@@ -103,18 +103,18 @@ function CollapsibleGroup({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div>
+    <div className="border-b border-gray-100 last:border-b-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center justify-between py-1 mb-1.5 ${colorCls}`}
+        className={`w-full flex items-center justify-between py-4 ${colorCls}`}
       >
-        <span>{label}</span>
+        <span className="font-semibold text-sm flex items-center gap-1.5">{label}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-          className={`w-3.5 h-3.5 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}>
+          className={`w-4 h-4 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}>
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      {open && <div className="space-y-1.5">{children}</div>}
+      {open && <div className="pb-3 space-y-1.5">{children}</div>}
     </div>
   )
 }
@@ -233,7 +233,6 @@ function ProductCard({
   const toxic = prod.ingredients.filter((i) => i.riskLevel === 'toxic').length
   const warning = prod.ingredients.filter((i) => i.riskLevel === 'warning').length
   const caution = prod.ingredients.filter((i) => i.riskLevel === 'caution').length
-  const safe = prod.ingredients.filter((i) => i.riskLevel === 'safe').length
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
@@ -246,19 +245,13 @@ function ProductCard({
             <p className="font-semibold text-sm text-[#1a1a2e] truncate">{prod.displayName}</p>
             <p className="text-xs text-gray-400">{productTypeLabel(prod.type)} · {prod.ingredients.length} 種已知成分</p>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {toxic > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-red-500 text-white rounded-full font-bold">{toxic} 有毒</span>
-            )}
-            {warning > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-orange-500 text-white rounded-full font-bold">{warning} 警示</span>
-            )}
-            {caution > 0 && !toxic && !warning && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-400 text-white rounded-full font-bold">{caution} 注意</span>
-            )}
-            {prod.ingredients.length > 0 && !toxic && !warning && !caution && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white rounded-full font-bold">{safe} 安全</span>
-            )}
+          <div className="shrink-0">
+            {(() => {
+              if (toxic > 0) return <span className="text-[11px] px-2.5 py-0.5 bg-red-100 text-red-700 rounded-full font-semibold">{toxic} 有毒</span>
+              if (warning > 0) return <span className="text-[11px] px-2.5 py-0.5 bg-orange-100 text-orange-700 rounded-full font-semibold">{warning} 警示</span>
+              if (caution > 0) return <span className="text-[11px] px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-semibold">{caution} 注意</span>
+              return null
+            })()}
           </div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
             <polyline points="6 9 12 15 18 9" />
@@ -620,14 +613,14 @@ export default function AnalysisPage() {
             )}
 
             {/* Tabs */}
-            <div className="flex bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="flex bg-gray-100 rounded-xl p-1">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                  className={`flex-1 py-2 text-xs font-semibold transition-all rounded-lg ${
                     activeTab === tab.key
-                      ? 'bg-[#4F7CFF] text-white'
+                      ? 'bg-[#111111] text-white shadow-sm'
                       : 'text-gray-500'
                   }`}
                 >
@@ -642,7 +635,7 @@ export default function AnalysisPage() {
                 {result.warningItems.length > 0 && (
                   <CollapsibleGroup
                     colorCls="text-orange-600"
-                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>⛔</span> 警示成分 ({result.warningItems.length})</span>}
+                    label={<>⛔ 警示成分 <span className="text-orange-400">({result.warningItems.length})</span></>}
                   >
                     {result.warningItems.map((item, i) => (
                       <IngredientRow key={i} item={item} defaultOpen={false} />
@@ -651,8 +644,8 @@ export default function AnalysisPage() {
                 )}
                 {result.cautionItems.length > 0 && (
                   <CollapsibleGroup
-                    colorCls="text-yellow-700"
-                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>⚡</span> 需注意成分 ({result.cautionItems.length})</span>}
+                    colorCls="text-amber-600"
+                    label={<>⚡ 需注意成分 <span className="text-amber-400">({result.cautionItems.length})</span></>}
                   >
                     {result.cautionItems.map((item, i) => (
                       <IngredientRow key={i} item={item} />
@@ -668,8 +661,8 @@ export default function AnalysisPage() {
                   if (riskItems.length === 0) return null
                   return (
                     <CollapsibleGroup
-                      colorCls="text-[#4F7CFF]"
-                      label={<span className="text-xs font-semibold flex items-center gap-1"><span>📊</span> 營養安全風險 ({riskItems.length})</span>}
+                      colorCls="text-amber-600"
+                      label={<>📊 營養安全風險 <span className="text-amber-400">({riskItems.length})</span></>}
                     >
                       {riskItems.map((item, i) => {
                         const cfg = NUTRITION_STATUS_CONFIG[item.status]
@@ -691,7 +684,7 @@ export default function AnalysisPage() {
                   <CollapsibleGroup
                     colorCls="text-green-700"
                     defaultOpen={false}
-                    label={<span className="text-xs font-semibold flex items-center gap-1"><span>✓</span> 安全成分 ({result.safeItems.length})</span>}
+                    label={<>✓ 安全成分 <span className="text-green-400">({result.safeItems.length})</span></>}
                   >
                     {result.safeItems.map((item, i) => (
                       <IngredientRow key={i} item={item} />
@@ -945,9 +938,7 @@ export default function AnalysisPage() {
                               <th className="text-center px-3 py-2 font-medium text-gray-600 min-w-[60px]">合計</th>
                               <th className="text-left px-3 py-2 font-medium text-gray-500 min-w-[100px]">來源產品</th>
                               <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[70px]">建議範圍</th>
-                              {nutritionAiResult && (
-                                <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[50px]">AI 狀態</th>
-                              )}
+                              <th className="text-center px-3 py-2 font-medium text-gray-400 min-w-[50px]">AI 狀態</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1004,11 +995,9 @@ export default function AnalysisPage() {
                                     )}
                                   </td>
                                   <td className="text-center px-3 py-2 text-gray-400 text-[11px]">{rangeLabel}</td>
-                                  {nutritionAiResult && (
-                                    <td className="text-center px-3 py-2">
-                                      {aiStatus ? aiBadge[aiStatus] : <span className="text-gray-300 text-[10px]">—</span>}
-                                    </td>
-                                  )}
+                                  <td className="text-center px-3 py-2">
+                                    {aiStatus ? aiBadge[aiStatus] : <span className="text-gray-300 text-[10px]">—</span>}
+                                  </td>
                                 </tr>
                               )
                             })}
