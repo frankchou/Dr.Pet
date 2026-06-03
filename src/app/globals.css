@@ -1,12 +1,37 @@
+/* Google Fonts — must precede tailwindcss import */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
 @import "tailwindcss";
 
 :root {
-  --color-primary: #C4714A;
-  --color-secondary: #4CAF50;
-  --color-bg: #FAF7F2;
+  /* PurePaw Brand */
+  --pp-font: 'Quicksand', 'Noto Sans TC', sans-serif;
+  --pp-canvas: #F4F7FB;
+  --pp-apricot: #FFE8D6;
+  --pp-apricot-dark: #D98A53;
+  --pp-ink: #111111;
+  --pp-card: #FFFFFF;
+  --pp-muted: #64748B;
+
+  /* Shadows */
+  --pp-shadow-nav: 0 -10px 40px rgba(0,0,0,0.04);
+  --pp-shadow-pop: 0 8px 32px rgba(0,0,0,0.12);
 }
 
 body {
-  background-color: var(--color-bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--pp-canvas);
+  font-family: var(--pp-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--pp-ink);
 }
+
+/* Hide scrollbar but keep scroll */
+.hide-scrollbar { scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Tailwind animation utilities */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-in-from-bottom { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.animate-in { animation-fill-mode: both; }
+.fade-in { animation: fade-in 0.45s ease-out; }
+.slide-in-from-bottom-4 { animation: slide-in-from-bottom 0.45s ease-out; }

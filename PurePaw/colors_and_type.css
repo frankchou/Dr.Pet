@@ -1,0 +1,116 @@
+/* ============================================================
+   PurePaw 無敏毛孩 — Colors & Type
+   Source of truth: v2 Figma Make build (theme.css + components)
+   Aesthetic: cute, rounded, Korean-stationery hand-drawn.
+   Font: Quicksand. Heavy weights, generous radii, soft shadows.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ---- Core neutrals ---- */
+  --pp-ink:        #111111;  /* primary text, active pills, CTAs */
+  --pp-ink-soft:   #3A332C;  /* warm near-black used over photos */
+  --pp-slate-900:  #0F172A;
+  --pp-slate-700:  #334155;
+  --pp-slate-600:  #475569;  /* tag / chip body text */
+  --pp-slate-500:  #64748B;  /* secondary text */
+  --pp-slate-400:  #94A3B8;  /* tertiary / inactive nav + icons */
+  --pp-slate-300:  #CBD5E1;
+  --pp-slate-200:  #E2E8F0;  /* hairline borders */
+  --pp-slate-100:  #F1F5F9;  /* chip / toggle track fills */
+  --pp-slate-50:   #F8FAFC;  /* input + inset fills */
+  --pp-white:      #FFFFFF;  /* card surface */
+
+  /* ---- App canvas ---- */
+  --pp-canvas:     #F4F7FB;  /* cool blue-grey behind cards */
+
+  /* ---- Brand: macaron apricot (primary brand colour) ---- */
+  --pp-apricot:        #FFE8D6;  /* logo base, login panel, brand fields */
+  --pp-apricot-soft:   #FEF1E2;  /* soft card fills, icon chips */
+  --pp-apricot-accent: #D98A53;  /* terracotta — accent text, key numbers, highlight pills */
+
+  /* ---- Secondary accents (sparingly, semantic) ---- */
+  --pp-pink:        #FCA5A5;  /* blush cheeks, alert borders */
+  --pp-pink-strong: #F391B3;  /* grooming category */
+  --pp-pink-soft:   #FDE2EC;  /* disease icon chip */
+  --pp-yellow:      #FDE047;  /* star / sparkle highlights */
+  --pp-blue:        #7C9CE3;  /* calendar event dots, info accents */
+
+  /* ---- Greens (health / success / diet-plan) ---- */
+  --pp-green-deep:  #1B4332;
+  --pp-green:       #2D6A4F;  /* diet-plan text, nutritionist icon */
+  --pp-green-mid:   #5C946E;  /* secondary schedule accent */
+  --pp-green-soft:  #E2F3E4;  /* diet-plan banner, success chips */
+  --pp-green-line:  #B7E4C7;  /* diet-plan banner border */
+  --pp-green-mint:  #A7F3D0;  /* check on dark surface */
+  --pp-green-chip:  #EAF5ED;  /* symptom icon chip */
+
+  /* ---- Danger ---- */
+  --pp-danger:      #DC2626;
+  --pp-danger-text: #991B1B;
+  --pp-danger-body: #B91C1C;
+  --pp-danger-soft: #FEF2F2;
+
+  /* ---- Borders & rings ---- */
+  --pp-border:        rgba(0, 0, 0, 0.1);   /* theme default border */
+  --pp-border-card:   rgba(15, 23, 42, 0.05); /* slate-900/5, the signature 2px card border */
+  --pp-ring:          rgba(0, 0, 0, 0.2);
+
+  /* ---- Radii (very rounded) ---- */
+  --pp-r-pill:  9999px;        /* tabs, chips, buttons, segmented controls */
+  --pp-r-icon:  20px;          /* icon containers (rounded-[20px]) */
+  --pp-r-sm:    16px;          /* rounded-2xl — small cards, inputs */
+  --pp-r-md:    24px;          /* rounded-3xl — standard cards */
+  --pp-r-lg:    28px;          /* rounded-[28px] — list/feature cards */
+  --pp-r-xl:    32px;          /* rounded-[32px] — hero/large cards, --radius */
+  --pp-r-xxl:   40px;          /* rounded-[40px] — desktop panel, login sheet */
+
+  /* ---- Shadows (soft, low-contrast) ---- */
+  --pp-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --pp-shadow-md:  0 4px 12px rgba(0, 0, 0, 0.06);
+  --pp-shadow-lg:  0 10px 24px rgba(0, 0, 0, 0.10);          /* black CTA / FAB */
+  --pp-shadow-pop: 0 12px 32px rgba(148, 163, 184, 0.35);   /* popovers (shadow-slate-200/50) */
+  --pp-shadow-nav: 0 -10px 40px rgba(0, 0, 0, 0.04);         /* bottom nav lift */
+
+  /* ---- Type ---- */
+  --pp-font: 'Quicksand', ui-rounded, 'Hiragino Maru Gothic ProN', 'Noto Sans TC', sans-serif;
+  --pp-fw-regular: 400;
+  --pp-fw-medium:  500;  /* body / secondary copy */
+  --pp-fw-semibold:600;
+  --pp-fw-bold:    700;  /* most labels, card titles */
+  --pp-fw-black:   700;  /* "font-black" in source — Quicksand caps at 700 (see README) */
+}
+
+/* ============================================================
+   Base + semantic type
+   Quicksand is rounded & friendly; the brand leans on WEIGHT
+   (bold/700) and SIZE for hierarchy, not many type families.
+   ============================================================ */
+body {
+  font-family: var(--pp-font);
+  color: var(--pp-ink);
+  background: var(--pp-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Display / page titles — e.g. "歡迎回來", pet name, "總覽" */
+.pp-display { font-weight: 700; font-size: 30px; line-height: 1.15; letter-spacing: -0.02em; color: var(--pp-ink); }
+/* Screen title — "日誌", "設定與檔案" */
+.pp-h1      { font-weight: 700; font-size: 20px; line-height: 1.2;  letter-spacing: -0.01em; color: var(--pp-ink); }
+/* Section heading — "健康檔案概覽", "快速功能" */
+.pp-h2      { font-weight: 700; font-size: 20px; line-height: 1.25; letter-spacing: -0.01em; color: var(--pp-slate-900); }
+/* Card title — "飲食需知", "核心疫苗補打" */
+.pp-h3      { font-weight: 700; font-size: 18px; line-height: 1.3;  color: var(--pp-slate-800, #1E293B); }
+/* Body */
+.pp-body    { font-weight: 500; font-size: 14px; line-height: 1.6;  color: var(--pp-slate-700); }
+/* Secondary / supporting */
+.pp-muted   { font-weight: 500; font-size: 14px; line-height: 1.5;  color: var(--pp-slate-500); }
+/* Label — form labels, nav text */
+.pp-label   { font-weight: 700; font-size: 12px; line-height: 1.2;  color: var(--pp-slate-500); }
+/* Chip / pill text */
+.pp-chip    { font-weight: 700; font-size: 11px; line-height: 1;    color: var(--pp-slate-600); }
+/* Caption / nav micro-label */
+.pp-caption { font-weight: 700; font-size: 10px; line-height: 1.2;  color: var(--pp-slate-400); }
+/* Emphasised metric — "剩 15 天" */
+.pp-metric  { font-weight: 700; font-size: 20px; line-height: 1;    color: var(--pp-apricot-accent); }

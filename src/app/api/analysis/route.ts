@@ -17,29 +17,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Pet not found' }, { status: 404 })
     }
 
-    // 取得近 60 天使用的產品（去重）
-    const sixtyDaysAgo = new Date()
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
-
-    const usages = await prisma.productUsage.findMany({
-      where: { petId, date: { gte: sixtyDaysAgo } },
+    // 優先使用 PetProduct 活躍清單；若為空則 fallback 到近 180 天使用記錄
+    const petProducts = await prisma.petProduct.findMany({
+      where: { petId, isActive: true },
       include: { product: true },
-      orderBy: { date: 'desc' },
     })
 
-    // 去重產品
-    const seenIds = new Set<string>()
-    const uniqueProducts = usages
-      .filter((u) => {
-        if (seenIds.has(u.productId)) return false
-        seenIds.add(u.productId)
-        return true
+    let uniqueProducts = petProducts.map((pp) => pp.product)
+
+    if (uniqueProducts.length === 0) {
+      const since = new Date()
+      since.setDate(since.getDate() - 180)
+      const usages = await prisma.productUsage.findMany({
+        where: { petId, date: { gte: since } },
+        include: { product: true },
+        orderBy: { date: 'desc' },
       })
-      .map((u) => u.product)
+      const seenIds = new Set<string>()
+      uniqueProducts = usages
+        .filter((u) => { if (seenIds.has(u.productId)) return false; seenIds.add(u.productId); return true })
+        .map((u) => u.product)
+    }
 
     if (uniqueProducts.length === 0) {
       return NextResponse.json(
-        { error: '尚無使用中的食品/用品記錄，請先在「日誌」中新增產品。' },
+        { error: '尚無使用中的食品/用品記錄，請先在「產品管理」中新增產品。' },
         { status: 422 }
       )
     }

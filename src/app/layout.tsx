@@ -1,11 +1,16 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import BottomNav from '@/components/layout/BottomNav'
 import ClientShell from '@/components/layout/ClientShell'
+import SessionProviderWrapper from '@/components/layout/SessionProviderWrapper'
+import AppShell from '@/components/layout/AppShell'
 
 export const metadata: Metadata = {
-  title: '寵物隨行醫師 Dr. Pet',
-  description: '您的寵物健康管理助理',
+  title: 'PurePaw 無敏毛孩',
+  description: '專屬台灣毛孩的 AI 寵物營養健康管理平台',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
@@ -15,15 +20,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
-      <body className="antialiased">
-        <div className="min-h-screen bg-[#FAF7F2]">
-          <div className="max-w-[480px] mx-auto min-h-screen relative">
-            <ClientShell>
-              <main className="pb-20">{children}</main>
-            </ClientShell>
-          </div>
-        </div>
-        <BottomNav />
+      <body className="antialiased bg-[#F4F7FB]">
+        <SessionProviderWrapper>
+          <ClientShell>
+            <AppShell>
+              {children}
+            </AppShell>
+          </ClientShell>
+        </SessionProviderWrapper>
       </body>
     </html>
   )

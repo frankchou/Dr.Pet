@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
     const body = await request.json()
     const {
       name,
@@ -50,8 +52,16 @@ export async function POST(request: NextRequest) {
         medicalHistory: medicalHistory || null,
         mainProblems: JSON.stringify(mainProblems || []),
         avatar: avatar || null,
+        userId: session?.user?.id ?? null,
       },
     })
+
+    // 若已登入，建立 owner 成員紀錄
+    if (session?.user?.id) {
+      await prisma.petMember.create({
+        data: { petId: pet.id, userId: session.user.id, role: 'owner' },
+      })
+    }
 
     return NextResponse.json(pet, { status: 201 })
   } catch (error) {
