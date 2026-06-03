@@ -1266,7 +1266,7 @@ export default function DiaryPage() {
   const [planStart, setPlanStart]       = useState('')
 
   // ─ Modal 開關 ──────────────────────────────────────────────────────────────
-  const [calTab, setCalTab] = useState<'month' | 'week'>('week')
+  const [calTab, setCalTab] = useState<'month' | 'week'>('month')
 
   const [showMedModal, setShowMedModal]     = useState(false)
   const [showGroomModal, setShowGroomModal] = useState(false)
@@ -1399,22 +1399,22 @@ export default function DiaryPage() {
   return (
     <div className="px-6 md:px-8 min-h-full flex flex-col gap-6 pb-28 pt-4 animate-in fade-in slide-in-from-bottom-4">
 
+      {/* ─── 月曆 / 週曆 toggle（最頂部）────────────────────────────── */}
+      <div className="flex bg-slate-100 p-1.5 rounded-full">
+        <button onClick={() => setCalTab('month')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
+        <button onClick={() => setCalTab('week')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
+      </div>
+      {calTab === 'month'
+        ? <MonthCalendar recordedDates={recordedDates} petId={petId} />
+        : <WeekCalendar recordedDates={recordedDates} petId={petId} />
+      }
+
       {/* ─── DiaryTopBar ──────────────────────────────────────────────── */}
       <DiaryTopBar
         onOpenMedication={() => setShowMedModal(true)}
         onOpenGrooming={() => setShowGroomModal(true)}
         onOpenMeasurement={() => setShowMeasModal(true)}
       />
-
-      {/* ─── 月曆 / 週曆 toggle ──────────────────────────────────────── */}
-      <div className="flex bg-slate-100 p-1.5 rounded-full">
-        <button onClick={() => setCalTab('week')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
-        <button onClick={() => setCalTab('month')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
-      </div>
-      {calTab === 'week'
-        ? <WeekCalendar recordedDates={recordedDates} petId={petId} />
-        : <MonthCalendar recordedDates={recordedDates} petId={petId} />
-      }
 
       {/* ─── 當日健康紀錄分隔標題 ─────────────────────────────────────── */}
       <div className="flex items-center gap-3">
