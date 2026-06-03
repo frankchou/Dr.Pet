@@ -1,3 +1,10 @@
+/**
+ * ⚠️ V1 殘留頁面 — 已棄用，請勿修改或新增功能
+ *
+ * 此頁面為 v1 版本的 AI 諮詢介面，現已被 /nutritionist/page.tsx 完整取代。
+ * BottomNav 與 Sidebar 均不再連結至此路由，無任何使用者入口。
+ * 保留供歷史參考，後續可直接刪除。
+ */
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Button from '@/components/ui/Button'
