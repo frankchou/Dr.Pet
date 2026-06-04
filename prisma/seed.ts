@@ -188,9 +188,10 @@ async function main() {
   console.log('  MeasurementRecord: 今日已建立')
 
   // ── 6. MedicationRecord ───────────────────────────────────────────────────
+  // 驅蟲：7 天前施作、設下次提醒（首頁「體外驅蟲」+「未來日程表-醫療」會用到）
   await prisma.medicationRecord.upsert({
     where:  { id: `demo-med-${dateStr(-7)}` },
-    update: {},
+    update: { nextReminder: new Date(`${dateStr(23)}T00:00:00`) },
     create: {
       id:            `demo-med-${dateStr(-7)}`,
       petId:         pet.id,
@@ -199,19 +200,38 @@ async function main() {
       deworming:     JSON.stringify(['新疥爽（滴劑）']),
       prescriptions: JSON.stringify([]),
       clinicVisits:  JSON.stringify([]),
+      nextReminder:  new Date(`${dateStr(23)}T00:00:00`),
     },
   })
-  console.log('  MedicationRecord: 1 筆')
-
-  // ── 7. GroomingRecord ─────────────────────────────────────────────────────
-  await prisma.groomingRecord.upsert({
-    where:  { id: `demo-groom-${dateStr(-3)}` },
+  // 疫苗：約一年前施打、設下次年度提醒（首頁「年度疫苗」會用到）
+  await prisma.medicationRecord.upsert({
+    where:  { id: `demo-med-vaccine-${dateStr(-300)}` },
     update: {},
     create: {
-      id:    `demo-groom-${dateStr(-3)}`,
-      petId: pet.id,
-      date:  dateStr(-3),
-      mode:  'home',
+      id:            `demo-med-vaccine-${dateStr(-300)}`,
+      petId:         pet.id,
+      date:          dateStr(-300),
+      vaccines:      JSON.stringify(['八合一疫苗', '狂犬病疫苗']),
+      deworming:     JSON.stringify([]),
+      prescriptions: JSON.stringify([]),
+      clinicVisits:  JSON.stringify(['年度健康檢查']),
+      nextReminder:  new Date(`${dateStr(65)}T00:00:00`),
+    },
+  })
+  console.log('  MedicationRecord: 2 筆')
+
+  // ── 7. GroomingRecord ─────────────────────────────────────────────────────
+  // 3 天前洗澡、設下次提醒（首頁「未來日程表-美容」會用到）
+  await prisma.groomingRecord.upsert({
+    where:  { id: `demo-groom-${dateStr(-3)}` },
+    update: { medBath: true, nextReminder: new Date(`${dateStr(11)}T00:00:00`) },
+    create: {
+      id:           `demo-groom-${dateStr(-3)}`,
+      petId:        pet.id,
+      date:         dateStr(-3),
+      mode:         'home',
+      medBath:      true,
+      nextReminder: new Date(`${dateStr(11)}T00:00:00`),
     },
   })
   console.log('  GroomingRecord: 1 筆')

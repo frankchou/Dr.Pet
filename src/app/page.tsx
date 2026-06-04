@@ -191,6 +191,113 @@ interface HealthMetricRecord {
   waterIntake?: string | null
 }
 
+interface MedicationRecord {
+  id: string
+  date: string // YYYY-MM-DD
+  vaccines: string // JSON array of string
+  deworming: string // JSON array of string
+  prescriptions: string // JSON array of string
+  clinicVisits: string // JSON array of string
+  nextReminder?: string | null
+}
+
+interface GroomingRecord {
+  id: string
+  date: string // YYYY-MM-DD
+  mode: string
+  medBath: boolean
+  carbonatedSpa: boolean
+  dentalClean: boolean
+  customTreatment: boolean
+  customName?: string | null
+  nextReminder?: string | null
+}
+
+interface ScheduleItem {
+  id: string
+  title: string
+  /** 日期文字（YYYY/MM/DD），來自 nextReminder 或 record.date */
+  dateLabel: string
+  /** 距今天數，負數代表已過、用於排序 */
+  daysFromNow: number
+  isFuture: boolean
+}
+
+/** 今天 00:00 的時間戳 */
+function todayMidnight(): number {
+  const t = new Date()
+  t.setHours(0, 0, 0, 0)
+  return t.getTime()
+}
+
+/** 把 YYYY-MM-DD 解析為當地午夜時間戳；失敗回 null */
+function parseYmd(ymd: string | null | undefined): number | null {
+  if (!ymd) return null
+  const [y, m, d] = ymd.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d).getTime()
+}
+
+/** DateTime 字串 → 當地午夜時間戳；失敗回 null */
+function parseDateMidnight(value: string | null | undefined): number | null {
+  if (!value) return null
+  const t = new Date(value)
+  if (isNaN(t.getTime())) return null
+  t.setHours(0, 0, 0, 0)
+  return t.getTime()
+}
+
+/** 時間戳 → MM/DD 顯示 */
+function formatMmDd(ts: number): string {
+  const d = new Date(ts)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 時間戳 → YYYY/MM/DD 顯示 */
+function formatYmdSlash(ts: number): string {
+  const d = new Date(ts)
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 距今天數（正數=未來、0=今天、負數=已過） */
+function daysBetween(ts: number): number {
+  return Math.round((ts - todayMidnight()) / 86400000)
+}
+
+/** 重要日程：某類別最近一次日期 + 推估下次到期 */
+interface CareSummary {
+  lastLabel: string // MM/DD
+  nextLabel: string | null // MM/DD（下次到期推估）
+}
+
+/**
+ * 從用藥紀錄推算某類別（疫苗/驅蟲）的最近一次與下次到期。
+ * 下次到期優先採該筆紀錄的 nextReminder；無則以固定週期推估
+ * （疫苗：年度；驅蟲：每 3 個月）。
+ */
+function summarizeCare(
+  records: MedicationRecord[],
+  field: 'vaccines' | 'deworming',
+  intervalDays: number,
+): CareSummary | null {
+  const matched = records
+    .filter(r => parseJson<string[]>(r[field], []).some(v => v.trim() !== ''))
+    .map(r => ({ record: r, ts: parseYmd(r.date) }))
+    .filter((x): x is { record: MedicationRecord; ts: number } => x.ts !== null)
+    .sort((a, b) => b.ts - a.ts)
+
+  if (matched.length === 0) return null
+
+  const latest = matched[0]
+  const reminderTs = parseDateMidnight(latest.record.nextReminder)
+  const nextTs = reminderTs ?? latest.ts + intervalDays * 86400000
+
+  return {
+    lastLabel: formatMmDd(latest.ts),
+    nextLabel: nextTs > latest.ts ? formatMmDd(nextTs) : null,
+  }
+}
+
 export default function HomePage() {
   const [pets, setPets] = useState<Pet[]>([])
   const [currentPetId, setCurrentPetId] = useState<string>('')
@@ -198,6 +305,8 @@ export default function HomePage() {
   const [scheduleTab, setScheduleTab] = useState<'medical' | 'grooming' | 'holiday'>('medical')
   const [healthMetric, setHealthMetric] = useState<HealthMetricRecord | null>(null)
   const [todayMealCount, setTodayMealCount] = useState<number>(0)
+  const [medRecords, setMedRecords] = useState<MedicationRecord[]>([])
+  const [groomingRecords, setGroomingRecords] = useState<GroomingRecord[]>([])
 
   // 載入寵物列表（共同飼主可能在另一端新增/編輯毛孩，故可被輪詢重抓）
   const fetchPets = useCallback(() => {
@@ -231,6 +340,16 @@ export default function HomePage() {
     fetch(`/api/usages?petId=${petId}&date=${today}`)
       .then(r => r.ok ? r.json() : [])
       .then((d: unknown[]) => setTodayMealCount(Array.isArray(d) ? d.length : 0))
+      .catch(() => {})
+    // 重要日程（疫苗/驅蟲）+ 未來日程表（醫療/美容）
+    // ⚠️ 這兩支 API 在 Phase 1-C 已加 requirePetAccess 且 petId 必填，故務必帶 petId
+    fetch(`/api/medication-record?petId=${petId}&recent=30`)
+      .then(r => r.ok ? r.json() : [])
+      .then((d: MedicationRecord[]) => setMedRecords(Array.isArray(d) ? d : []))
+      .catch(() => {})
+    fetch(`/api/grooming-record?petId=${petId}&recent=30`)
+      .then(r => r.ok ? r.json() : [])
+      .then((d: GroomingRecord[]) => setGroomingRecords(Array.isArray(d) ? d : []))
       .catch(() => {})
   }, [])
 
@@ -286,6 +405,61 @@ export default function HomePage() {
     return Math.ceil((next.getTime() - today.getTime()) / 86400000)
   })()
   const genderBadge = currentPet ? genderLabel(currentPet.sex, currentPet.isNeutered) : null
+
+  // 2-1 重要日程：年度疫苗（年度週期）、體外驅蟲（每 3 個月）
+  const vaccineSummary = summarizeCare(medRecords, 'vaccines', 365)
+  const dewormingSummary = summarizeCare(medRecords, 'deworming', 90)
+
+  // 2-2 未來日程表：醫療（用藥/看診）與美容的未來排程
+  // 排程日期優先用 nextReminder（下次提醒），否則用紀錄日期；只保留今天(含)以後者。
+  const medicalSchedule: ScheduleItem[] = medRecords
+    .map((r): ScheduleItem | null => {
+      const reminderTs = parseDateMidnight(r.nextReminder)
+      const recordTs = parseYmd(r.date)
+      const ts = reminderTs ?? recordTs
+      if (ts === null) return null
+      const labels = [
+        ...parseJson<string[]>(r.vaccines, []),
+        ...parseJson<string[]>(r.deworming, []),
+        ...parseJson<string[]>(r.prescriptions, []),
+        ...parseJson<string[]>(r.clinicVisits, []),
+      ].filter(v => v.trim() !== '')
+      const title = labels.length > 0 ? labels.join('、') : '醫療紀錄'
+      return {
+        id: r.id,
+        title,
+        dateLabel: formatYmdSlash(ts),
+        daysFromNow: daysBetween(ts),
+        isFuture: ts >= todayMidnight(),
+      }
+    })
+    .filter((x): x is ScheduleItem => x !== null && x.isFuture)
+    .sort((a, b) => a.daysFromNow - b.daysFromNow)
+
+  const groomingSchedule: ScheduleItem[] = groomingRecords
+    .map((r): ScheduleItem | null => {
+      const reminderTs = parseDateMidnight(r.nextReminder)
+      const recordTs = parseYmd(r.date)
+      const ts = reminderTs ?? recordTs
+      if (ts === null) return null
+      const parts: string[] = []
+      if (r.medBath) parts.push('藥浴')
+      if (r.carbonatedSpa) parts.push('碳酸泉')
+      if (r.dentalClean) parts.push('潔牙')
+      if (r.customTreatment && r.customName) parts.push(r.customName)
+      const title = parts.length > 0 ? parts.join('、') : '洗澡美容'
+      return {
+        id: r.id,
+        title,
+        dateLabel: formatYmdSlash(ts),
+        daysFromNow: daysBetween(ts),
+        isFuture: ts >= todayMidnight(),
+      }
+    })
+    .filter((x): x is ScheduleItem => x !== null && x.isFuture)
+    .sort((a, b) => a.daysFromNow - b.daysFromNow)
+
+  const activeSchedule = scheduleTab === 'medical' ? medicalSchedule : groomingSchedule
 
   return (
     <div
@@ -398,12 +572,30 @@ export default function HomePage() {
               <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#D98A53]/50 transition-colors cursor-pointer bg-white">
                 <SvgCalendar size={24} />
                 <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">年度疫苗</span>
-                <span className="text-sm font-bold text-slate-400">--</span>
+                {vaccineSummary ? (
+                  <>
+                    <span className="text-sm font-bold text-slate-700 leading-tight">{vaccineSummary.lastLabel}</span>
+                    {vaccineSummary.nextLabel && (
+                      <span className="text-[10px] font-bold text-[#D98A53] mt-0.5">下次 {vaccineSummary.nextLabel}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs font-bold text-slate-400">尚未記錄</span>
+                )}
               </div>
               <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#5C946E]/50 transition-colors cursor-pointer bg-white">
                 <SvgDroplets size={24} />
                 <span className="text-[10px] md:text-xs font-bold text-slate-600 mb-1 mt-2">體外驅蟲</span>
-                <span className="text-sm font-bold text-slate-400">--</span>
+                {dewormingSummary ? (
+                  <>
+                    <span className="text-sm font-bold text-slate-700 leading-tight">{dewormingSummary.lastLabel}</span>
+                    {dewormingSummary.nextLabel && (
+                      <span className="text-[10px] font-bold text-[#5C946E] mt-0.5">下次 {dewormingSummary.nextLabel}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs font-bold text-slate-400">尚未記錄</span>
+                )}
               </div>
               <div className="border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#F391B3]/50 transition-colors cursor-pointer bg-white">
                 <SvgCake size={24} />
@@ -596,12 +788,36 @@ export default function HomePage() {
               </>
             )}
 
-            {/* 醫療 / 美容 tab：暫無資料 */}
+            {/* 醫療 / 美容 tab：串 MedicationRecord / GroomingRecord 的未來排程 */}
             {(scheduleTab === 'medical' || scheduleTab === 'grooming') && (
-              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-8 shadow-sm flex flex-col items-center justify-center text-center gap-2">
-                <SvgCalendar size={32} />
-                <p className="text-slate-400 font-bold text-sm">尚無日程記錄</p>
-              </div>
+              activeSchedule.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {activeSchedule.map(item => (
+                    <div
+                      key={item.id}
+                      className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4"
+                    >
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${scheduleTab === 'medical' ? 'bg-[#FDE2EC] text-[#D98A53]' : 'bg-[#EDF3FB] text-[#5C946E]'}`}>
+                        {scheduleTab === 'medical' ? <SvgHeartPulse /> : <SvgDroplets size={20} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{item.title}</p>
+                        <p className="text-sm font-bold text-slate-400">
+                          {item.dateLabel} · {item.daysFromNow === 0 ? '就是今天' : `還有 ${item.daysFromNow} 天`}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full shrink-0 ${scheduleTab === 'medical' ? 'text-[#D98A53] bg-[#FEF1E2]' : 'text-[#5C946E] bg-[#EAF5ED]'}`}>
+                        {scheduleTab === 'medical' ? '醫療' : '美容'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-8 shadow-sm flex flex-col items-center justify-center text-center gap-2">
+                  <SvgCalendar size={32} />
+                  <p className="text-slate-400 font-bold text-sm">尚無日程記錄</p>
+                </div>
+              )
             )}
 
             {/* 健康指標 — 活力/水分已移至健康檔案概覽，此區塊暫時隱藏

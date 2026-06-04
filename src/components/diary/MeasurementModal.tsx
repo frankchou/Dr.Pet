@@ -142,7 +142,8 @@ export default function MeasurementModal({ petId, date, onClose, onSaved }: Prop
       className="fixed inset-0 z-50 bg-black/40 flex flex-col justify-end"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-t-3xl overflow-y-auto max-h-[90vh] flex flex-col">
+      {/* max-h 用 dvh 追蹤手機實際可視高度（避免被網址列／工具列截斷）；內容區獨立捲動以確保能捲到底部按鈕 */}
+      <div className="bg-white rounded-t-3xl max-h-[90dvh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
@@ -160,7 +161,10 @@ export default function MeasurementModal({ petId, date, onClose, onSaved }: Prop
           </button>
         </div>
 
-        <div className="px-5 pb-8 space-y-6">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pt-px space-y-6"
+          style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+        >
           {/* 體重 */}
           <div className="pt-4">
             <p className="text-sm font-bold text-slate-700 mb-2">體重</p>

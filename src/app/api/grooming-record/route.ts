@@ -8,17 +8,30 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const petId = searchParams.get('petId')
     const date = searchParams.get('date')
+    const recentParam = searchParams.get('recent')
 
-    if (!petId || !date) {
-      return NextResponse.json(
-        { error: 'petId and date are required' },
-        { status: 400 }
-      )
+    if (!petId) {
+      return NextResponse.json({ error: 'petId is required' }, { status: 400 })
     }
 
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // ?recent=N 模式：回傳最近 N 筆（供首頁未來日程/歷史用）
+    if (recentParam !== null) {
+      const take = Math.max(1, parseInt(recentParam) || 5)
+      const records = await prisma.groomingRecord.findMany({
+        where: { petId },
+        orderBy: { date: 'desc' },
+        take,
+      })
+      return NextResponse.json(records)
+    }
+
+    if (!date) {
+      return NextResponse.json({ error: 'date or recent is required' }, { status: 400 })
+    }
 
     const record = await prisma.groomingRecord.findFirst({
       where: { petId, date },
