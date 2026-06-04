@@ -3,6 +3,26 @@ import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { symptomTypeLabel, severityLabel, productTypeLabel, VET_REFERENCE_SCOPE } from '@/lib/utils'
 
+// GET /api/analyze?petId=X — 讀取該寵物最新的關聯分析（AIInsight）供顯示端使用
+export async function GET(request: NextRequest) {
+  try {
+    const petId = request.nextUrl.searchParams.get('petId')
+    if (!petId) {
+      return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+    }
+
+    const insight = await prisma.aIInsight.findFirst({
+      where: { petId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return NextResponse.json(insight)
+  } catch (error) {
+    console.error('GET /api/analyze error:', error)
+    return NextResponse.json({ error: 'Failed to fetch insight' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

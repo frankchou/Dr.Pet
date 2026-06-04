@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 
@@ -35,14 +35,54 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [nickname, setNickname] = useState('飼主')
   const scrollRef = useRef<HTMLElement>(null)
   const { data: session } = useSession()
+  const router = useRouter()
   const avatarUrl = session?.user?.image || null
   const displayName = session?.user?.name || nickname
+
+  // 手機版頭像選單（對齊桌面 Sidebar 的 ProfileMenu：切換毛孩 / 設定 / 登出）
+  const [pets, setPets] = useState<{ id: string; name: string }[]>([])
+  const [currentPetId, setCurrentPetId] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // All hooks must be before any conditional return
   useEffect(() => {
     const stored = localStorage.getItem('drpet_nickname')
     if (stored) setNickname(stored)
+    const storedPetId = localStorage.getItem('drpet_currentPetId')
+    if (storedPetId) setCurrentPetId(storedPetId)
   }, [])
+
+  // 載入毛孩清單（供切換）
+  useEffect(() => {
+    fetch('/api/pets')
+      .then(r => r.json())
+      .then((data: { id: string; name: string }[]) => setPets(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  // 點選單外關閉；同步其他來源（桌面切換）的 currentPetId
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false)
+    }
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'drpet_currentPetId' && e.newValue) setCurrentPetId(e.newValue)
+    }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [])
+
+  function switchPet(petId: string): void {
+    localStorage.setItem('drpet_currentPetId', petId)
+    window.dispatchEvent(new StorageEvent('storage', { key: 'drpet_currentPetId', newValue: petId }))
+    setCurrentPetId(petId)
+    setShowMenu(false)
+  }
 
   useEffect(() => {
     const el = scrollRef.current
@@ -86,14 +126,59 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {!isChat && (
             <header className="px-6 md:px-10 pt-12 md:pt-10 pb-4 flex items-center justify-between z-30 sticky top-0 bg-transparent pointer-events-none">
 
-              {/* Mobile: user avatar */}
-              <div className={`relative flex items-center gap-3 md:hidden transition-all duration-300 ${fade}`}>
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center shadow-sm border border-white/50 pointer-events-auto cursor-pointer">
+              {/* Mobile: user avatar — 點擊開啟選單（切換毛孩 / 設定 / 登出），對齊桌面 */}
+              <div ref={menuRef} className={`relative md:hidden transition-all duration-300 ${fade}`}>
+                <button
+                  onClick={() => setShowMenu(v => !v)}
+                  aria-label="開啟選單"
+                  className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center shadow-sm border border-white/50 pointer-events-auto cursor-pointer"
+                >
                   {avatarUrl
                     ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     : <span className="text-sm font-bold text-[#D98A53]">{displayName.charAt(0)}</span>
                   }
-                </div>
+                </button>
+
+                {showMenu && (
+                  <div className="absolute top-full left-0 mt-2 w-60 z-50 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 pointer-events-auto" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+                    <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                      <p className="text-xs text-slate-400 font-bold mb-2">切換毛孩</p>
+                      {pets.map((pet) => (
+                        <button
+                          key={pet.id}
+                          onClick={() => switchPet(pet.id)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg text-left"
+                        >
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${pet.id === currentPetId ? 'bg-[#111111]' : 'bg-[#D98A53]'}`}>
+                            {pet.name.charAt(0)}
+                          </div>
+                          <span className="text-sm font-bold text-slate-800 truncate">
+                            {pet.name}{pet.id === currentPetId ? ' (目前)' : ''}
+                          </span>
+                        </button>
+                      ))}
+                      {pets.length === 0 && (
+                        <p className="text-xs text-slate-400 px-2 py-1">尚無毛孩資料</p>
+                      )}
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={() => { setShowMenu(false); router.push('/settings') }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-slate-700"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <span className="text-sm font-bold">設定</span>
+                      </button>
+                      <button
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-red-500"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <span className="text-sm font-bold">登出</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Desktop: page title + subtitle */}
@@ -102,8 +187,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {subtitle && <p className="text-sm text-slate-500 font-medium mt-1">{subtitle}</p>}
               </div>
 
-              {/* Bell icon */}
+              {/* Bell icon — 通知/快訊，導向 /news */}
               <button
+                onClick={() => router.push('/news')}
+                aria-label="通知與快訊"
                 className={`w-10 h-10 rounded-full border border-white/40 bg-white/30 backdrop-blur-md flex items-center justify-center hover:bg-white/60 transition-all duration-300 shadow-sm ml-auto pointer-events-auto ${fade}`}
               >
                 <BellIcon />

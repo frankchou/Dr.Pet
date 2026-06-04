@@ -408,12 +408,18 @@ function MonthCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: 
 
 // ─── Week calendar ────────────────────────────────────────────────────────────
 
-function WeekCalendar({ recordedDates, petId }: { recordedDates: Set<string>; petId: string }) {
+function WeekCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: Set<string>; petId: string; onDateSelect?: (date: string | null) => void }) {
   const today = new Date()
   const startOfWeek = new Date(today)
   startOfWeek.setDate(today.getDate() - today.getDay())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const days = ['日', '一', '二', '三', '四', '五', '六']
+
+  function selectDate(key: string) {
+    const next = selectedDate === key ? null : key
+    setSelectedDate(next)
+    onDateSelect?.(next)
+  }
 
   return (
     <div className="mb-4">
@@ -426,7 +432,7 @@ function WeekCalendar({ recordedDates, petId }: { recordedDates: Set<string>; pe
           const hasRec = recordedDates.has(key)
           const isSelected = key === selectedDate
           return (
-            <div key={i} onClick={() => setSelectedDate(prev => prev === key ? null : key)} className="flex flex-col items-center gap-2 relative z-10 cursor-pointer">
+            <div key={i} onClick={() => selectDate(key)} className="flex flex-col items-center gap-2 relative z-10 cursor-pointer">
               <span className="text-xs font-bold text-slate-400">{label}</span>
               <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all',
                 isSelected ? 'bg-[#D98A53] text-white shadow-md' : isToday ? 'bg-[#111111] text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'
@@ -1294,8 +1300,8 @@ export default function DiaryPage() {
 
       {/* ─── 月曆 / 週曆 toggle（最頂部）────────────────────────────── */}
       <div className="flex bg-slate-100 p-1.5 rounded-full">
-        <button onClick={() => setCalTab('month')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
-        <button onClick={() => setCalTab('week')} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
+        <button onClick={() => { setCalTab('month'); setSelectedDate(today) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
+        <button onClick={() => { setCalTab('week'); setSelectedDate(today) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
       </div>
       {calTab === 'month' ? (
         <>
@@ -1314,7 +1320,12 @@ export default function DiaryPage() {
       ) : (
         <>
           {/* ─── 週曆模式：週曆 + 記錄快捷 + 健康紀錄編輯區 ─────────── */}
-          <WeekCalendar recordedDates={recordedDates} petId={petId} />
+          {/* 週曆選取的日期上拋，驅動健康紀錄與評分卡的 date；取消選取則回到今日 */}
+          <WeekCalendar
+            recordedDates={recordedDates}
+            petId={petId}
+            onDateSelect={(d) => setSelectedDate(d ?? today)}
+          />
           <DiaryTopBar
             onOpenMedication={() => setShowMedModal(true)}
             onOpenGrooming={() => setShowGroomModal(true)}

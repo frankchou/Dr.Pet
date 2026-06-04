@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import IngredientAnalysis from '@/components/home/IngredientAnalysis'
+import CorrelationInsights from '@/components/nutrition/CorrelationInsights'
 
 export default function NutritionPage() {
   const [petId, setPetId] = useState('')
@@ -20,6 +21,7 @@ export default function NutritionPage() {
   return (
     <div className="px-6 md:px-8 min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       <IngredientAnalysis petId={petId} />
+      <CorrelationInsights petId={petId} />
     </div>
   )
 }

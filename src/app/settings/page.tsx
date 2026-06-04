@@ -195,13 +195,17 @@ function CoOwnerSection({ petId }: { petId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailInput.trim() }),
       })
-      const data = await res.json() as { inviteUrl?: string; error?: string }
+      const data = await res.json() as { inviteUrl?: string; error?: string; emailSent?: boolean }
       if (!res.ok) {
         showToast(data.error ?? '邀請失敗')
         return
       }
       setEmailInput('')
-      showToast('邀請已送出')
+      showToast(
+        data.emailSent
+          ? '邀請信已寄出'
+          : '邀請已建立，但信件寄送失敗，可改用 QR Code 分享'
+      )
       await loadData()
       // 自動顯示 QR Code
       if (data.inviteUrl) {

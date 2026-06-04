@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn, parseJson, formatDate } from '@/lib/utils'
 import type { DietAnalysisResult } from '@/app/api/diet-analysis/route'
 import DietSwitchPlan from '@/components/diary/DietSwitchPlan'
+import DailyReactionCard from '@/components/diary/DailyReactionCard'
+
+// 產品評分（「吃後感想」）為 v1 功能，現版暫時隱藏、保留待未來啟用。
+// 其歸屬為飲食頁；要重新啟用把此旗標改為 true 即可。見 docs/未來功能.md。
+const SHOW_PRODUCT_REACTIONS: boolean = false
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -997,31 +1002,6 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
   )
 }
 
-// ─── 換食計畫佔位 ─────────────────────────────────────────────────────────────
-
-function SwitchPlanComingSoon() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[#F5EDE8] flex items-center justify-center mb-4">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#C4714A" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={28} height={28}>
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-          <line x1="12" y1="22.08" x2="12" y2="12" />
-        </svg>
-      </div>
-      <h3 className="font-bold text-slate-900 text-lg mb-2">換食計畫</h3>
-      <p className="text-sm text-slate-500 font-medium leading-relaxed">
-        AI 智能換食計畫功能即將上線
-        <br />
-        敬請期待
-      </p>
-      <span className="mt-4 px-4 py-1.5 bg-[#F5EDE8] text-[#C4714A] text-xs font-bold rounded-full">
-        即將推出
-      </span>
-    </div>
-  )
-}
-
 // ─── 主頁面 ───────────────────────────────────────────────────────────────────
 
 type TabKey = 'daily' | 'switch'
@@ -1234,6 +1214,13 @@ export default function DietPage() {
             <div className="mt-4 mb-5">
               <p className="text-sm font-bold text-[#8B7355]">{formatDate(today)}</p>
             </div>
+
+            {/* 產品評分（吃後感想）— v1 功能，暫時隱藏，見 docs/未來功能.md */}
+            {SHOW_PRODUCT_REACTIONS && petId && (
+              <div className="mb-5">
+                <DailyReactionCard petId={petId} date={todayStr} />
+              </div>
+            )}
 
             {loading ? (
               <div className="flex justify-center py-12">

@@ -110,6 +110,7 @@ model Pet {
   medicationRecords    MedicationRecord[]
   groomingRecords      GroomingRecord[]
   measurementRecords   MeasurementRecord[]
+  dailyMealPlans       DailyMealPlan[]
 }
 
 model SymptomEntry {
@@ -139,6 +140,7 @@ model Product {
   reactions      ProductReaction[]
   communityRecsFor   CommunityRec[] @relation("BadProduct")
   communityRecsRec   CommunityRec[] @relation("RecommendedProduct")
+  mealPlanItems      MealPlanItem[]
 }
 
 model ProductUsage {
@@ -377,4 +379,49 @@ model MeasurementRecord {
   tempCelsius        Float?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+// 每日餐食計畫主體
+model DailyMealPlan {
+  id        String         @id @default(cuid())
+  petId     String
+  pet       Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  date      String         // YYYY-MM-DD
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  items     MealPlanItem[]
+
+  @@unique([petId, date])
+}
+
+// 餐食計畫項目（早/午/晚）
+model MealPlanItem {
+  id             String        @id @default(cuid())
+  planId         String
+  plan           DailyMealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  session        String        // morning/noon/evening
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  customName     String?
+  quantity       Float         @default(1)
+  unit           String        @default("份")
+  estimatedGrams Float?
+  tags           String        @default("[]") // JSON array
+  sortOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
+}
+
+// AI 生成的寵物健康快訊
+model NewsArticle {
+  id          String    @id @default(cuid())
+  category    String    // food_safety / danger / health
+  subCategory String?
+  title       String
+  summary     String
+  sourceUrl   String?
+  sourceName  String?
+  publishedAt DateTime?
+  isUrgent    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
 }

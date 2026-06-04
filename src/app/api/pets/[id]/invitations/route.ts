@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { sendInviteEmail } from '@/lib/email'
 
 // GET /api/pets/[id]/invitations — 取得邀請清單（owner only）
 export async function GET(
@@ -81,9 +82,35 @@ export async function POST(
       targetEmail,
       expiresAt,
     },
+    include: {
+      pet: { select: { name: true } },
+      invitedBy: { select: { name: true } },
+    },
   })
 
-  const inviteUrl = `${process.env.NEXTAUTH_URL}/invite/${invitation.token}`
+  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+  if (!baseUrl) {
+    // 缺 baseUrl 時 inviteUrl 會變成相對路徑，信件連結與 QR Code 將失效，明確警告方便部署時發現
+    console.warn('[invitations] NEXTAUTH_URL / AUTH_URL 皆未設定，inviteUrl 將為相對路徑，邀請連結可能失效')
+  }
+  const inviteUrl = `${baseUrl}/invite/${invitation.token}`
 
-  return NextResponse.json({ inviteUrl, token: invitation.token }, { status: 201 })
+  // 寄出邀請信。寄信失敗不應讓整個邀請流程崩潰，回傳 emailSent 供前端提示。
+  let emailSent = false
+  try {
+    await sendInviteEmail({
+      to: targetEmail,
+      petName: invitation.pet.name,
+      inviterName: invitation.invitedBy.name ?? '一位飼主',
+      inviteUrl,
+    })
+    emailSent = true
+  } catch (err) {
+    console.error('[invitations] 邀請信寄送失敗：', err)
+  }
+
+  return NextResponse.json(
+    { inviteUrl, token: invitation.token, emailSent },
+    { status: 201 }
+  )
 }
