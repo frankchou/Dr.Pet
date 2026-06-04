@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const petId = searchParams.get('petId')
 
+    // petId 改必填：無 petId 則無從驗權限（原本回全站資料屬漏洞）
+    if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const documents = await prisma.document.findMany({
-      where: petId ? { petId } : undefined,
+      where: { petId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -29,6 +38,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const document = await prisma.document.create({
       data: {

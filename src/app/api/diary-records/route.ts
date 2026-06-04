@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   const petId = request.nextUrl.searchParams.get('petId')
@@ -8,6 +10,10 @@ export async function GET(request: NextRequest) {
   if (!petId || !date) {
     return NextResponse.json({ error: 'petId and date required' }, { status: 400 })
   }
+
+  const session = await auth()
+  const access = await requirePetAccess(petId, session?.user?.id ?? '')
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
   const dayStart = new Date(`${date}T00:00:00.000Z`)
   const dayEnd   = new Date(`${date}T23:59:59.999Z`)

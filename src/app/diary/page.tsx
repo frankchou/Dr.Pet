@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { cn, parseJson, productTypeLabel } from '@/lib/utils'
+import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 
 // ─── 新版日誌元件 ──────────────────────────────────────────────────────────────
 import DiaryTopBar from '@/components/diary/DiaryTopBar'
@@ -1314,6 +1315,15 @@ export default function DiaryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [petId, visibleYearMonthsKey, datesRefreshKey])
 
+  // ─── 共享資料即時同步 ─────────────────────────────────────────────────────
+  // 共同飼主可能在另一端新增紀錄；定時 / 重新聚焦時重抓「月曆圓點」與「月總覽」
+  // 等唯讀彙整資料。HealthLogSection 為使用者即時編輯的表單（debounce 自動存檔），
+  // 若被輪詢覆寫會清掉未存的編輯，故刻意不納入輪詢。
+  const refreshShared = useCallback(() => {
+    if (petId) setDatesRefreshKey(k => k + 1)
+  }, [petId])
+  usePollingRefresh(refreshShared)
+
   // ─── 換食計畫同步 localStorage ────────────────────────────────────────────
   const handleSetHasPlan = (v: boolean) => {
     setHasPlan(v)
@@ -1400,6 +1410,7 @@ export default function DiaryPage() {
             petId={petId}
             date={monthSelectedDate}
             recordedCount={recordedDates.size}
+            refreshKey={datesRefreshKey}
           />
         </>
       ) : (

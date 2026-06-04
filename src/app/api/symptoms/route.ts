@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,9 +10,16 @@ export async function GET(request: NextRequest) {
     const symptomType = searchParams.get('symptomType')
     const limit = parseInt(searchParams.get('limit') || '50')
 
+    // petId 改必填：無 petId 則無從驗權限（原本回全站資料屬漏洞）
+    if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const symptoms = await prisma.symptomEntry.findMany({
       where: {
-        ...(petId && { petId }),
+        petId,
         ...(symptomType && { symptomType }),
       },
       orderBy: { createdAt: 'desc' },
@@ -43,6 +52,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const entry = await prisma.symptomEntry.create({
       data: {

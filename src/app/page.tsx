@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import { parseJson, symptomTypeLabel } from '@/lib/utils'
 import IngredientAnalysis from '@/components/home/IngredientAnalysis'
 
@@ -198,34 +199,51 @@ export default function HomePage() {
   const [healthMetric, setHealthMetric] = useState<HealthMetricRecord | null>(null)
   const [todayMealCount, setTodayMealCount] = useState<number>(0)
 
-  // 載入寵物列表
-  useEffect(() => {
+  // 載入寵物列表（共同飼主可能在另一端新增/編輯毛孩，故可被輪詢重抓）
+  const fetchPets = useCallback(() => {
     fetch('/api/pets')
       .then(r => r.json())
       .then((data: Pet[]) => {
         setPets(Array.isArray(data) ? data : [])
-        const stored = localStorage.getItem('drpet_currentPetId')
-        const match = stored && data.find(p => p.id === stored)
-        const first = match ? stored : data[0]?.id ?? ''
-        setCurrentPetId(first)
+        setCurrentPetId(prev => {
+          if (prev && data.some(p => p.id === prev)) return prev
+          const stored = localStorage.getItem('drpet_currentPetId')
+          const match = stored && data.find(p => p.id === stored)
+          return match ? stored : data[0]?.id ?? ''
+        })
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  // 載入健康指標 + 今日餐數
   useEffect(() => {
-    if (!currentPetId) return
+    fetchPets()
+  }, [fetchPets])
+
+  // 載入健康指標 + 今日餐數
+  const fetchPetDaily = useCallback((petId: string) => {
+    if (!petId) return
     const today = new Date().toISOString().split('T')[0]
-    fetch(`/api/health-metrics?petId=${currentPetId}&date=${today}`)
+    fetch(`/api/health-metrics?petId=${petId}&date=${today}`)
       .then(r => r.ok ? r.json() : null)
       .then((d: HealthMetricRecord | null) => setHealthMetric(d))
       .catch(() => {})
-    fetch(`/api/usages?petId=${currentPetId}&date=${today}`)
+    fetch(`/api/usages?petId=${petId}&date=${today}`)
       .then(r => r.ok ? r.json() : [])
       .then((d: unknown[]) => setTodayMealCount(Array.isArray(d) ? d.length : 0))
       .catch(() => {})
-  }, [currentPetId])
+  }, [])
+
+  useEffect(() => {
+    fetchPetDaily(currentPetId)
+  }, [currentPetId, fetchPetDaily])
+
+  // 共享資料即時同步：定時 / 重新聚焦時重抓寵物列表與當前毛孩的當日資料
+  const refreshShared = useCallback(() => {
+    fetchPets()
+    fetchPetDaily(currentPetId)
+  }, [fetchPets, fetchPetDaily, currentPetId])
+  usePollingRefresh(refreshShared)
 
   // 監聽 localStorage drpet_currentPetId 的變化（header 切換寵物時）
   useEffect(() => {

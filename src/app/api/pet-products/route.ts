@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 // GET /api/pet-products?petId=X  — list active products for a pet
 export async function GET(request: NextRequest) {
   try {
     const petId = request.nextUrl.searchParams.get('petId')
     if (!petId) return NextResponse.json({ error: 'petId required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const items = await prisma.petProduct.findMany({
       where: { petId, isActive: true },
@@ -25,6 +31,10 @@ export async function POST(request: NextRequest) {
   if (!petId || !productId || !listType) {
     return NextResponse.json({ error: 'petId, productId, listType required' }, { status: 400 })
   }
+
+  const session = await auth()
+  const access = await requirePetAccess(petId, session?.user?.id ?? '')
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
   // If there's already an active entry for this pet+product, update it
   const existing = await prisma.petProduct.findFirst({

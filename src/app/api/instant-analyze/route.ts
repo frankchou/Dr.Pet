@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -18,6 +20,10 @@ export async function GET(request: NextRequest) {
   try {
     const petId = request.nextUrl.searchParams.get('petId')
     if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const records = await prisma.instantAnalysis.findMany({
       where: { petId },
@@ -42,6 +48,11 @@ export async function POST(request: NextRequest) {
     if (!file || !petId) {
       return NextResponse.json({ error: 'file 和 petId 為必填' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     if (file.size > 20 * 1024 * 1024) {
       return NextResponse.json({ error: '檔案過大，請上傳 20MB 以內的圖片' }, { status: 413 })

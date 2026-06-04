@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { analyzeIngredients } from '@/lib/ingredientAnalyzer'
 import { parseJson } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +13,10 @@ export async function GET(request: NextRequest) {
     if (!petId) {
       return NextResponse.json({ error: 'petId is required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) {

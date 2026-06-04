@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +11,10 @@ export async function GET(request: NextRequest) {
     const yearMonth = searchParams.get('yearMonth')  // YYYY-MM，回傳整月所有紀錄
 
     if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     // 整月查詢
     if (yearMonth) {
@@ -55,6 +61,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     // 序列化所有 JSON array / object 欄位（前端可傳陣列，這裡統一轉成字串）
     const serialized: Record<string, unknown> = {}

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccessByRecord } from '@/lib/petAccess'
 
 export async function GET(
   _request: NextRequest,
@@ -7,6 +9,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+
+    const session = await auth()
+    const access = await requirePetAccessByRecord('symptomEntry', id, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const entry = await prisma.symptomEntry.findUnique({
       where: { id },
     })
@@ -28,6 +35,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    const session = await auth()
+    const access = await requirePetAccessByRecord('symptomEntry', id, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     await prisma.symptomEntry.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {

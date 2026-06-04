@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { parseJson } from '@/lib/utils'
 
 interface HealthLogData {
@@ -27,6 +27,8 @@ interface Props {
   // 本月「任何紀錄來源」的不重複天數（與月曆圓點同義）。
   // 用於「已記錄 X / 當月天數」徽章；健康良好／異常仍以 DailyHealthLog 計算。
   recordedCount?: number
+  // 共享資料輪詢用：父層每次重抓時 +1，觸發本元件重新抓取月/日 logs。
+  refreshKey?: number
 }
 
 function Pill({ label, colorClass }: { label: string; colorClass: string }) {
@@ -160,7 +162,7 @@ function MetricSection({ title, items, colorFn }: MetricSectionProps) {
   )
 }
 
-export default function MonthHealthOverview({ petId, date, recordedCount: unionRecordedCount }: Props) {
+export default function MonthHealthOverview({ petId, date, recordedCount: unionRecordedCount, refreshKey = 0 }: Props) {
   const [monthLogs, setMonthLogs] = useState<HealthLogData[]>([])
   const [dayLog, setDayLog]       = useState<HealthLogData | null>(null)
   const [loading, setLoading]     = useState(false)
@@ -170,26 +172,34 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
 
   const totalDays = new Date(parseInt(date.slice(0, 4)), parseInt(date.slice(5, 7)), 0).getDate()
 
-  // 取整月 logs
+  // 取整月 logs。輪詢重抓（僅 refreshKey 變動）時靜默更新，不顯示 spinner 避免閃爍。
+  const lastFetchSigRef = useRef('')
   useEffect(() => {
     if (!petId) return
-    setLoading(true)
+    const sig = `${petId}|${yearMonth}`
+    const silent = sig === lastFetchSigRef.current
+    lastFetchSigRef.current = sig
+    if (!silent) setLoading(true)
     fetch(`/api/daily-health-log?petId=${petId}&yearMonth=${yearMonth}`)
       .then(r => r.ok ? r.json() : [])
       .then((data: HealthLogData[]) => setMonthLogs(data))
       .catch(() => setMonthLogs([]))
-      .finally(() => setLoading(false))
-  }, [petId, yearMonth])
+      .finally(() => { if (!silent) setLoading(false) })
+  }, [petId, yearMonth, refreshKey])
 
-  // 取單日 log
+  // 取單日 log。輪詢重抓（僅 refreshKey 變動）時不先清空，避免摘要閃爍。
+  const lastDaySigRef = useRef('')
   useEffect(() => {
     if (!petId || !date) return
-    setDayLog(null)
+    const sig = `${petId}|${date}`
+    const silent = sig === lastDaySigRef.current
+    lastDaySigRef.current = sig
+    if (!silent) setDayLog(null)
     fetch(`/api/daily-health-log?petId=${petId}&date=${date}`)
       .then(r => r.ok ? r.json() : null)
       .then((data: HealthLogData | null) => setDayLog(data))
-      .catch(() => setDayLog(null))
-  }, [petId, date])
+      .catch(() => { if (!silent) setDayLog(null) })
+  }, [petId, date, refreshKey])
 
   // ── 月份統計 ────────────────────────────────────────────────────────────────
   // 健康相關統計「一律以 DailyHealthLog 為基準」，避免把「只有飲食紀錄的日子」誤算成健康良好。

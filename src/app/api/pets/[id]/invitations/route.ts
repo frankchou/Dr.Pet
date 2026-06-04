@@ -59,12 +59,14 @@ export async function POST(
     return NextResponse.json({ error: 'email is required' }, { status: 400 })
   }
 
-  // 確認對方尚未是成員
-  const existingMember = await prisma.petMember.findFirst({
-    where: { petId, user: { email: targetEmail } },
+  // 確認對方尚未是成員（共同飼主）。email 比對一律轉小寫，避免 SQLite 大小寫敏感造成漏判。
+  const members = await prisma.petMember.findMany({
+    where: { petId },
+    select: { user: { select: { email: true } } },
   })
-  if (existingMember) {
-    return NextResponse.json({ error: '該用戶已是此毛孩的成員' }, { status: 400 })
+  const alreadyMember = members.some(m => m.user.email?.toLowerCase() === targetEmail)
+  if (alreadyMember) {
+    return NextResponse.json({ error: '該用戶已是此毛孩的共同飼主' }, { status: 400 })
   }
 
   // 若已有 pending 邀請，先將其設為 expired

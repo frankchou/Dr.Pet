@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import PageHeader from '@/components/layout/PageHeader'
 import { Input, Textarea, Select } from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -46,7 +47,8 @@ export default function PetDetailPage() {
     avatar: '' as string | null | undefined,
   })
 
-  useEffect(() => {
+  // 載入毛孩資料並填入表單。`silent` 為輪詢重抓用：不顯示整頁載入狀態。
+  const fetchPet = useCallback((silent = false) => {
     fetch(`/api/pets/${id}`)
       .then((r) => r.json())
       .then((data: Pet) => {
@@ -68,9 +70,20 @@ export default function PetDetailPage() {
           avatar: data.avatar,
         })
       })
-      .catch(() => setError('載入失敗'))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!silent) setError('載入失敗') })
+      .finally(() => { if (!silent) setLoading(false) })
   }, [id])
+
+  useEffect(() => {
+    fetchPet()
+  }, [fetchPet])
+
+  // 共享資料即時同步：定時 / 重新聚焦時重抓毛孩資料。
+  // 編輯中（editing）時跳過，避免輪詢覆寫使用者尚未儲存的表單內容。
+  const refreshShared = useCallback(() => {
+    if (!editing) fetchPet(true)
+  }, [editing, fetchPet])
+  usePollingRefresh(refreshShared)
 
   const toggleProblem = (value: string) => {
     setForm((prev) => ({

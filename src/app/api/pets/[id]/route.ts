@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(
   _request: NextRequest,
@@ -7,6 +9,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+
+    const session = await auth()
+    const access = await requirePetAccess(id, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const pet = await prisma.pet.findUnique({
       where: { id },
       include: {
@@ -39,6 +46,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    const session = await auth()
+    const access = await requirePetAccess(id, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const body = await request.json()
     const {
       name,
@@ -84,6 +96,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    // 刪毛孩會 cascade 清除全部資料，破壞性高，僅 owner 可操作
+    const session = await auth()
+    const access = await requirePetAccess(id, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+    if (access.role !== 'owner') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     await prisma.pet.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {

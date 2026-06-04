@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 // 回傳某寵物在指定月份「任何一種紀錄」的不重複日期清單（YYYY-MM-DD）。
 //
@@ -19,6 +21,10 @@ export async function GET(request: NextRequest) {
     if (!petId || !yearMonth) {
       return NextResponse.json({ error: 'petId and yearMonth are required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     // 字串日期欄位以前綴比對；DateTime 欄位以當月 UTC 區間比對
     const monthPrefix = `${yearMonth}-`

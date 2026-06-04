@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +101,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!petId || !planId || !items || !petInfo) {
       return NextResponse.json({ error: 'petId, planId, items, petInfo 為必填' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     if (items.length === 0) {
       return NextResponse.json(

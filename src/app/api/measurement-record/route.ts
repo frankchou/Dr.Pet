@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +15,10 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const record = await prisma.measurementRecord.findFirst({
       where: { petId, date },
@@ -67,6 +73,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const record = await prisma.measurementRecord.create({
       data: {

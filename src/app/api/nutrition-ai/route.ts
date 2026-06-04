@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 interface NutrientInput {
   name: string
@@ -38,6 +40,10 @@ export async function GET(request: NextRequest) {
     const petId = searchParams.get('petId')
     if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
 
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const saved = await prisma.nutritionAnalysis.findFirst({
       where: { petId },
       orderBy: { createdAt: 'desc' },
@@ -67,6 +73,11 @@ export async function POST(request: NextRequest) {
     if (!petId || !nutrients?.length) {
       return NextResponse.json({ error: '缺少必要參數' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) return NextResponse.json({ error: 'Pet not found' }, { status: 404 })

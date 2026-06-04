@@ -5,6 +5,8 @@ import { anthropic } from '@/lib/anthropic'
 import { analyzeIngredients } from '@/lib/ingredientAnalyzer'
 import { prisma } from '@/lib/prisma'
 import { parseJson } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 interface WebProduct {
   name: string
@@ -31,12 +33,19 @@ export async function POST(request: NextRequest) {
     const { query, petId } = body
     if (!query?.trim()) return NextResponse.json({ products: [] })
 
-    // 取得寵物資訊
+    // 取得寵物資訊：帶 petId 時需先驗權限，無權限就忽略 petId 降級為一般搜尋
+    // （避免破壞未綁寵物的正常用法，同時擋住用他人 petId 讀取寵物資料的 IDOR）
     let petSymptoms: string[] = []
     let petSpecies = '犬'
+    let allowedPetId: string | null = null
     if (petId) {
+      const session = await auth()
+      const access = await requirePetAccess(petId, session?.user?.id ?? '')
+      if (access.ok) allowedPetId = petId
+    }
+    if (allowedPetId) {
       const pet = await prisma.pet.findUnique({
-        where: { id: petId },
+        where: { id: allowedPetId },
         select: { species: true, mainProblems: true },
       })
       if (pet) {
@@ -45,7 +54,7 @@ export async function POST(request: NextRequest) {
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
         const recent = await prisma.symptomEntry.findMany({
-          where: { petId, createdAt: { gte: thirtyDaysAgo } },
+          where: { petId: allowedPetId, createdAt: { gte: thirtyDaysAgo } },
           select: { symptomType: true },
         })
         petSymptoms = [...new Set([...mainProblems, ...recent.map(s => s.symptomType)])]

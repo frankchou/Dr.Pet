@@ -77,6 +77,15 @@ async function main() {
   })
   console.log(`  Pet: ${pet.id} (${pet.name})`)
 
+  // ── 2b. Owner membership ────────────────────────────────────────────────────
+  // requirePetAccess 已用雙重判定（Pet.userId 即視為 owner），此處補一筆 owner member
+  // 作保險，使 demo 寵物與「建立寵物即建 owner membership」的正式流程資料一致。
+  await prisma.petMember.upsert({
+    where:  { petId_userId: { petId: pet.id, userId: user.id } },
+    update: {},
+    create: { petId: pet.id, userId: user.id, role: 'owner' },
+  })
+
   // ── 3. DailyHealthLog — 本月前 20 天（含今日）────────────────────────────
   // 每次呼叫 dateStr 都重新計算，避免跨日誤差
   // 分佈比例：60% 正常、20% 活動高/軟便、10% 疲倦/慢食/眼耳、10% 皮膚+消化異常

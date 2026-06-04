@@ -2,14 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { parseJson, symptomTypeLabel, VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess, requirePetAccessByRecord } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const petId = searchParams.get('petId')
 
+    // petId 改必填：無 petId 則無從驗權限（原本回全站資料屬漏洞）
+    if (!petId) return NextResponse.json({ error: 'petId is required' }, { status: 400 })
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const tasks = await prisma.weeklyTask.findMany({
-      where: petId ? { petId } : undefined,
+      where: { petId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -28,6 +37,11 @@ export async function POST(request: NextRequest) {
     if (!petId) {
       return NextResponse.json({ error: 'petId is required' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) {
@@ -121,6 +135,11 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // 由 taskId 反查所屬寵物驗權限（W 級：owner + co_owner），擋跨寵物越權
+    const session = await auth()
+    const access = await requirePetAccessByRecord('weeklyTask', taskId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const task = await prisma.weeklyTask.update({
       where: { id: taskId },

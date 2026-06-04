@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -10,6 +12,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!petId || !date) {
       return NextResponse.json({ error: 'petId and date are required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const plan = await prisma.dailyMealPlan.findUnique({
       where: { petId_date: { petId, date } },
@@ -36,6 +42,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!petId || !date) {
       return NextResponse.json({ error: 'petId and date are required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     // upsert — 若已存在直接回傳，否則建立
     const plan = await prisma.dailyMealPlan.upsert({

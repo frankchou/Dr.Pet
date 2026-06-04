@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import { requirePetAccessByRecord } from '@/lib/petAccess'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -8,6 +10,11 @@ interface RouteContext {
 export async function POST(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params
+
+    const authSession = await auth()
+    const access = await requirePetAccessByRecord('dailyMealPlan', planId, authSession?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
     const body = await request.json() as {
       session?: string
       productId?: string | null
@@ -29,11 +36,7 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
       return NextResponse.json({ error: 'session must be morning, noon, or evening' }, { status: 400 })
     }
 
-    // 確認 plan 存在
-    const plan = await prisma.dailyMealPlan.findUnique({ where: { id: planId } })
-    if (!plan) {
-      return NextResponse.json({ error: 'Meal plan not found' }, { status: 404 })
-    }
+    // plan 存在性已由 requirePetAccessByRecord 反查確認
 
     const item = await prisma.mealPlanItem.create({
       data: {
@@ -65,6 +68,10 @@ export async function DELETE(request: NextRequest, context: RouteContext): Promi
     if (!itemId) {
       return NextResponse.json({ error: 'itemId is required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccessByRecord('dailyMealPlan', planId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     // 確認 item 屬於該 plan，防止越權刪除
     const item = await prisma.mealPlanItem.findFirst({

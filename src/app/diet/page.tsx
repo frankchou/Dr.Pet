@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn, parseJson, formatDate } from '@/lib/utils'
+import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import type { DietAnalysisResult } from '@/app/api/diet-analysis/route'
 import DietSwitchPlan from '@/components/diary/DietSwitchPlan'
 import DailyReactionCard from '@/components/diary/DailyReactionCard'
@@ -1030,9 +1031,9 @@ export default function DietPage() {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  // 取得今日計畫
-  const fetchPlan = useCallback(async (pid: string) => {
-    setLoading(true)
+  // 取得今日計畫。`silent` 為輪詢重抓用：不顯示整頁 spinner，避免閃爍。
+  const fetchPlan = useCallback(async (pid: string, silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await fetch(`/api/meal-plans?petId=${pid}&date=${todayStr}`)
       if (res.ok) {
@@ -1042,7 +1043,7 @@ export default function DietPage() {
     } catch {
       // 靜默降級
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [todayStr])
 
@@ -1082,6 +1083,12 @@ export default function DietPage() {
       setLoading(false)
     }
   }, [fetchPlan, fetchPetInfo])
+
+  // 共享資料即時同步：定時 / 重新聚焦時重抓今日配餐（不重抓寵物基本資訊，較少變動）
+  const refreshShared = useCallback(() => {
+    if (petId) void fetchPlan(petId, true)
+  }, [petId, fetchPlan])
+  usePollingRefresh(refreshShared)
 
   // 確保有 plan（第一次新增品項時自動建立）
   const ensurePlan = useCallback(async (): Promise<MealPlan | null> => {

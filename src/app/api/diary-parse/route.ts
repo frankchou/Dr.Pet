@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { parseJson } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 interface ParsedRecord {
   type: 'symptom' | 'medication' | 'grooming' | 'health_metric' | 'food_note'
@@ -15,6 +17,11 @@ export async function POST(request: NextRequest) {
     if (!petId || !text?.trim()) {
       return NextResponse.json({ error: 'petId and text required' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const pet = await prisma.pet.findUnique({
       where: { id: petId },
@@ -75,6 +82,10 @@ export async function PUT(request: NextRequest) {
     if (!petId || !records?.length) {
       return NextResponse.json({ error: 'petId and records required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const today = new Date().toISOString().split('T')[0]
     const saved: string[] = []

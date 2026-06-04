@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { symptomTypeLabel, severityLabel, productTypeLabel, VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { requirePetAccess } from '@/lib/petAccess'
 
 // GET /api/analyze?petId=X — 讀取該寵物最新的關聯分析（AIInsight）供顯示端使用
 export async function GET(request: NextRequest) {
@@ -10,6 +12,10 @@ export async function GET(request: NextRequest) {
     if (!petId) {
       return NextResponse.json({ error: 'petId is required' }, { status: 400 })
     }
+
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const insight = await prisma.aIInsight.findFirst({
       where: { petId },
@@ -31,6 +37,11 @@ export async function POST(request: NextRequest) {
     if (!petId) {
       return NextResponse.json({ error: 'petId is required' }, { status: 400 })
     }
+
+    // AI route：先驗權限再呼叫 anthropic，避免無權者燒 token
+    const session = await auth()
+    const access = await requirePetAccess(petId, session?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) {

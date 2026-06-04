@@ -7,7 +7,10 @@ export async function GET() {
     const session = await auth()
     const userId = session?.user?.id
     const pets = await prisma.pet.findMany({
-      where: userId ? { userId } : {},
+      // owner（Pet.userId）或 co_owner（PetMember）皆可見；OR + relation filter 不會展開重複 row。
+      where: userId
+        ? { OR: [{ userId }, { members: { some: { userId } } }] }
+        : {},
       orderBy: { createdAt: 'desc' },
     })
     return NextResponse.json(pets)

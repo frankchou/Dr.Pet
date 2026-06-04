@@ -204,11 +204,12 @@ function CoOwnerSection({ petId }: { petId: string }) {
       showToast(
         data.emailSent
           ? '邀請信已寄出'
-          : '邀請已建立，但信件寄送失敗，可改用 QR Code 分享'
+          : '邀請已建立，但信件寄送失敗，可改用下方 QR Code 當備用'
       )
       await loadData()
-      // 自動顯示 QR Code
-      if (data.inviteUrl) {
+      // Email 為主要動線：寄信成功時不主動彈出 QR（QR 退為次要，
+      // 需要時點待接受邀請旁的 QR 按鈕即可）。僅在寄信失敗時自動顯示 QR 當備援。
+      if (!data.emailSent && data.inviteUrl) {
         const url = await QRCode.toDataURL(data.inviteUrl, { width: 200, margin: 1 })
         setQrDataUrl(url)
         setQrInviteUrl(data.inviteUrl)
@@ -321,6 +322,20 @@ function CoOwnerSection({ petId }: { petId: string }) {
         </button>
       </div>
 
+      {/* 動線說明：Email 邀請為主，QR Code 為當面分享的次要備用 */}
+      <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+        輸入對方 Google 帳號 email，系統會寄出邀請信。
+        若想當面分享，可在上方待接受邀請旁點
+        <span className="inline-flex items-center align-middle mx-0.5 text-slate-500">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="3" height="3" /><rect x="18" y="14" width="3" height="3" />
+            <rect x="14" y="18" width="3" height="3" /><rect x="18" y="18" width="3" height="3" />
+          </svg>
+        </span>
+        圖示，讓對方掃描 QR Code 加入。
+      </p>
+
       {/* Toast */}
       {toast && (
         <p className="mt-2 text-xs font-bold text-center text-[#D98A53]">{toast}</p>
@@ -336,7 +351,8 @@ function CoOwnerSection({ petId }: { petId: string }) {
             className="bg-white rounded-3xl p-6 max-w-xs w-full mx-4 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-base font-bold text-[#111111] text-center mb-4">掃描加入共同飼主</h3>
+            <h3 className="text-base font-bold text-[#111111] text-center mb-1">或讓對方當面掃描</h3>
+            <p className="text-xs text-slate-400 text-center mb-4">請對方掃描下方 QR Code 加入共同飼主</p>
             <div className="flex justify-center mb-4">
               <img src={qrDataUrl} alt="QR Code" className="w-[200px] h-[200px]" />
             </div>
