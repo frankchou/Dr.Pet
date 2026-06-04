@@ -103,62 +103,42 @@ async function main() {
 
   function makeLog(offset: number): { date: string } & LogTemplate {
     const date = dateStr(offset)
-    const idx = Math.abs(offset) % 10
-
-    // 0–5：正常（60%）
-    if (idx <= 5) {
-      return {
-        date, vitality: '精神飽滿', appetite: '食慾正常',
-        waterMl: 280 + (idx * 10), waterStatus: '飲水正常',
-        stoolType: '正常成形', stoolDetails: '[]', urineStatus: '尿量正常',
-        mood: JSON.stringify(['平靜放鬆']),
-        skinHair: '[]', eyeEar: '[]', dental: '[]', digestion: '[]',
-        respiratory: '[]', neuro: '[]', reproductive: '[]',
-        dailyChecklist: JSON.stringify(['刷牙清潔', '日常散步', '梳毛護理']),
-        dietStatusTab: 'all', mealStatuses: '{}',
-      }
+    // 共用預設（多選觀察欄位預設空，避免值與 UI 選項對不上）
+    const base = {
+      skinHair: '[]', eyeEar: '[]', dental: '[]', digestion: '[]',
+      respiratory: '[]', neuro: '[]', reproductive: '[]', stoolDetails: '[]',
+      dietStatusTab: 'all', mealStatuses: '{}',
+      dailyChecklist: JSON.stringify(['刷牙清潔', '日常散步', '梳毛護理']),
     }
-    // 6–7：活動意願高 + 軟便（20%）
-    if (idx <= 7) {
-      return {
-        date, vitality: '活動意願高', appetite: '胃口極佳',
-        waterMl: 310, waterStatus: '飲水正常',
-        stoolType: '軟便', stoolDetails: '[]', urineStatus: '尿量正常',
-        mood: JSON.stringify(['活潑好動']),
-        skinHair: '[]', eyeEar: '[]', dental: '[]', digestion: '[]',
-        respiratory: '[]', neuro: '[]', reproductive: '[]',
-        dailyChecklist: JSON.stringify(['日常散步']),
-        dietStatusTab: 'all', mealStatuses: '{}',
-      }
-    }
-    // 8：疲倦 + 慢食 + 眼耳（10%）
-    if (idx === 8) {
-      return {
-        date, vitality: '異常疲倦', appetite: '猶豫慢食',
-        waterMl: 150, waterStatus: '幾乎沒喝',
-        stoolType: '正常成形', stoolDetails: '[]', urineStatus: '頻尿蹲',
-        mood: '[]',
-        skinHair: '[]', eyeEar: JSON.stringify(['流淚淚痕']),
-        dental: '[]', digestion: '[]', respiratory: '[]', neuro: '[]', reproductive: '[]',
+    // 6 種彼此不同的每日樣態，依日期輪替 → 連續天數不會長一樣（6/1~6/4 各自不同）。
+    // 單選值皆採 schema 註解的合法選項，避免顯示不出來。
+    const templates: LogTemplate[] = [
+      // T0 良好
+      { ...base, vitality: '精神飽滿', appetite: '食慾正常', waterMl: 290, waterStatus: '飲水正常',
+        stoolType: '正常成形', urineStatus: '尿量正常', mood: JSON.stringify(['平靜放鬆']) },
+      // T1 活力充沛
+      { ...base, vitality: '活動意願高', appetite: '胃口極佳', waterMl: 330, waterStatus: '飲水正常',
+        stoolType: '正常成形', urineStatus: '尿量正常', mood: JSON.stringify(['平靜放鬆']),
+        dailyChecklist: JSON.stringify(['日常散步', '梳毛護理']) },
+      // T2 輕微軟便
+      { ...base, vitality: '精神飽滿', appetite: '食慾正常', waterMl: 300, waterStatus: '飲水正常',
+        stoolType: '便便偏軟', urineStatus: '尿量正常', mood: JSON.stringify(['平靜放鬆']) },
+      // T3 疲倦 + 喝得少 + 頻尿
+      { ...base, vitality: '異常疲倦', appetite: '猶豫慢食', waterMl: 150, waterStatus: '幾乎沒喝',
+        stoolType: '正常成形', urineStatus: '頻尿蹲', mood: '[]',
         dailyChecklist: JSON.stringify(['梳毛護理']),
-        dietStatusTab: 'reduced',
-        mealStatuses: JSON.stringify({ morning: 'done', evening: 'reduced' }),
-      }
-    }
-    // 9：皮膚 + 消化異常（10%）
-    return {
-      date, vitality: '精神飽滿', appetite: '挑食偏食',
-      waterMl: 200, waterStatus: '飲水正常',
-      stoolType: '帶黏液', stoolDetails: '[]', urineStatus: '尿量正常',
-      mood: JSON.stringify(['焦躁不安']),
-      skinHair: JSON.stringify(['頻繁抓搔', '掉毛嚴重']),
-      eyeEar: '[]', dental: '[]',
-      digestion: JSON.stringify(['嘔吐']),
-      respiratory: '[]', neuro: '[]', reproductive: '[]',
-      dailyChecklist: JSON.stringify(['梳毛護理']),
-      dietStatusTab: 'reduced',
-      mealStatuses: JSON.stringify({ morning: 'done', evening: 'refused' }),
-    }
+        dietStatusTab: 'reduced', mealStatuses: JSON.stringify({ morning: 'done', evening: 'reduced' }) },
+      // T4 腸胃 + 情緒（挑食、便便偏軟帶黏液、焦躁）
+      { ...base, vitality: '精神飽滿', appetite: '挑食偏食', waterMl: 210, waterStatus: '飲水正常',
+        stoolType: '便便偏軟', stoolDetails: JSON.stringify(['帶黏液']), urineStatus: '尿量正常',
+        mood: JSON.stringify(['焦躁不安']),
+        dailyChecklist: JSON.stringify(['梳毛護理']),
+        dietStatusTab: 'reduced', mealStatuses: JSON.stringify({ morning: 'done', evening: 'refused' }) },
+      // T5 喝水偏多
+      { ...base, vitality: '精神飽滿', appetite: '食慾正常', waterMl: 480, waterStatus: '異常狂喝',
+        stoolType: '正常成形', urineStatus: '尿量正常', mood: JSON.stringify(['平靜放鬆']) },
+    ]
+    return { date, ...templates[Math.abs(offset) % templates.length] }
   }
 
   let healthLogCount = 0

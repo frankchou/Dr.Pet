@@ -24,7 +24,9 @@ interface HealthLogData {
 interface Props {
   petId: string
   date: string           // 選取的日期（YYYY-MM-DD），用於單日摘要
-  recordedDates: Set<string>
+  // 本月「任何紀錄來源」的不重複天數（與月曆圓點同義）。
+  // 用於「已記錄 X / 當月天數」徽章；健康良好／異常仍以 DailyHealthLog 計算。
+  recordedCount?: number
 }
 
 function Pill({ label, colorClass }: { label: string; colorClass: string }) {
@@ -53,17 +55,52 @@ const WATER_COLOR: Record<string, string> = {
   '幾乎沒喝':  'bg-red-50 text-red-700 border-red-200',
 }
 
-// 取出陣列欄位有值的部位清單
-const MULTI_FIELDS: Array<{ key: keyof HealthLogData; label: string }> = [
-  { key: 'mood',        label: '情緒行為' },
-  { key: 'skinHair',   label: '皮膚毛髮' },
-  { key: 'eyeEar',     label: '眼耳' },
-  { key: 'dental',     label: '牙齒口腔' },
-  { key: 'digestion',  label: '消化系統' },
-  { key: 'respiratory', label: '呼吸' },
-  { key: 'neuro',      label: '神經溫控' },
-  { key: 'reproductive', label: '生殖分泌' },
+// 多選觀察欄位（值以 JSON 陣列字串儲存）
+//
+// `normalValues`：該欄位的「正常值白名單」。只有出現「不在白名單」的值才算異常觀察。
+// 情緒行為（MoodCard）含正常值（平靜放鬆／活潑好動），其餘卡片所有選項都是異常徵兆，
+// 因此 normalValues 為空集合，代表「有值即異常」。
+const MULTI_FIELDS: Array<{
+  key: keyof HealthLogData
+  label: string
+  normalValues: Set<string>
+}> = [
+  { key: 'mood',         label: '情緒行為',   normalValues: new Set(['平靜放鬆', '活潑好動']) },
+  { key: 'skinHair',     label: '皮膚毛髮',   normalValues: new Set() },
+  { key: 'eyeEar',       label: '眼耳',       normalValues: new Set() },
+  { key: 'dental',       label: '牙齒口腔',   normalValues: new Set() },
+  { key: 'digestion',    label: '消化系統',   normalValues: new Set() },
+  { key: 'respiratory',  label: '呼吸',       normalValues: new Set() },
+  { key: 'neuro',        label: '神經溫控',   normalValues: new Set() },
+  { key: 'reproductive', label: '生殖分泌',   normalValues: new Set() },
 ]
+
+// 單選觀察欄位的正常值白名單，用於判斷該日是否有異常
+const VITALITY_NORMAL = new Set(['精神飽滿', '活動意願高'])
+const APPETITE_NORMAL = new Set(['胃口極佳', '食慾正常'])
+const WATER_NORMAL    = new Set(['飲水正常'])
+const STOOL_NORMAL    = new Set(['正常成形', '羊便便(硬)'])
+const URINE_NORMAL    = new Set(['尿量正常'])
+
+// 回傳某多選欄位中「非正常值」的清單（即異常觀察值）
+function abnormalMultiValues(
+  log: HealthLogData,
+  field: { key: keyof HealthLogData; normalValues: Set<string> }
+): string[] {
+  return parseJson<string[]>(log[field.key] as string, []).filter(
+    v => !field.normalValues.has(v)
+  )
+}
+
+// 該日是否含任何異常觀察（統一以 DailyHealthLog 判斷）
+function hasAbnormality(log: HealthLogData): boolean {
+  if (log.vitality && !VITALITY_NORMAL.has(log.vitality)) return true
+  if (log.appetite && !APPETITE_NORMAL.has(log.appetite)) return true
+  if (log.waterStatus && !WATER_NORMAL.has(log.waterStatus)) return true
+  if (log.stoolType && !STOOL_NORMAL.has(log.stoolType)) return true
+  if (log.urineStatus && !URINE_NORMAL.has(log.urineStatus)) return true
+  return MULTI_FIELDS.some(f => abnormalMultiValues(log, f).length > 0)
+}
 
 // 計算頻率最高的值
 function topValue(vals: (string | null)[]): string | null {
@@ -83,9 +120,6 @@ function countByValue(vals: (string | null)[]): Array<[string, number]> {
   }
   return Object.entries(counts).sort((a, b) => b[1] - a[1])
 }
-
-// 正常值集合，用於排便與泌尿的篩選
-const URINE_NORMAL = new Set(['尿量正常'])
 
 // 各指標的 pill 顏色判斷
 function vitalityColor(val: string): string {
@@ -126,7 +160,7 @@ function MetricSection({ title, items, colorFn }: MetricSectionProps) {
   )
 }
 
-export default function MonthHealthOverview({ petId, date, recordedDates }: Props) {
+export default function MonthHealthOverview({ petId, date, recordedCount: unionRecordedCount }: Props) {
   const [monthLogs, setMonthLogs] = useState<HealthLogData[]>([])
   const [dayLog, setDayLog]       = useState<HealthLogData | null>(null)
   const [loading, setLoading]     = useState(false)
@@ -134,9 +168,7 @@ export default function MonthHealthOverview({ petId, date, recordedDates }: Prop
   const yearMonth = date.slice(0, 7)          // YYYY-MM
   const monthNum  = parseInt(date.split('-')[1], 10)
 
-  // 本月記錄天數
-  const recordedCount = [...recordedDates].filter(d => d.startsWith(yearMonth)).length
-  const totalDays     = new Date(parseInt(date.slice(0, 4)), parseInt(date.slice(5, 7)), 0).getDate()
+  const totalDays = new Date(parseInt(date.slice(0, 4)), parseInt(date.slice(5, 7)), 0).getDate()
 
   // 取整月 logs
   useEffect(() => {
@@ -159,22 +191,29 @@ export default function MonthHealthOverview({ petId, date, recordedDates }: Prop
       .catch(() => setDayLog(null))
   }, [petId, date])
 
+  // ── 月份統計 ────────────────────────────────────────────────────────────────
+  // 健康相關統計「一律以 DailyHealthLog 為基準」，避免把「只有飲食紀錄的日子」誤算成健康良好。
+  // 有健康日誌的不重複天數
+  const healthLogDays = new Set(monthLogs.map(l => l.date)).size
+  // 有異常天數：含任何非正常觀察值的天數（正常值白名單見 MULTI_FIELDS / *_NORMAL）
+  const abnormalDays  = monthLogs.filter(hasAbnormality).length
+  // 健康良好天數：有日誌但無異常 = 健康日誌天數 − 有異常天數（同源，必不為負）
+  const healthyDays   = healthLogDays - abnormalDays
+
+  // 「已記錄天數」與月曆圓點同義：本月任何紀錄來源的不重複天數（由父層聚合傳入）。
+  // 未傳入時退回健康日誌天數，避免顯示 0。
+  const recordedCount = unionRecordedCount ?? healthLogDays
+
   // 月份聚合
   const vitalityTop  = topValue(monthLogs.map(l => l.vitality))
   const appetiteTop  = topValue(monthLogs.map(l => l.appetite))
   const waterTop     = topValue(monthLogs.map(l => l.waterStatus))
-  const abnormalDays = monthLogs.filter(l =>
-    l.vitality === '異常疲倦' ||
-    l.appetite === '完全拒食' ||
-    l.urineStatus === '血尿' ||
-    MULTI_FIELDS.some(f => parseJson<string[]>(l[f.key] as string, []).length > 0)
-  ).length
 
-  // 月份有觀察的部位（跨天合計出現次數）
+  // 月份有「異常觀察」的部位（跨天合計出現天數；正常值不計）
   const sectionHits: Record<string, number> = {}
   for (const log of monthLogs) {
     for (const f of MULTI_FIELDS) {
-      if (parseJson<string[]>(log[f.key] as string, []).length > 0) {
+      if (abnormalMultiValues(log, f).length > 0) {
         sectionHits[f.label] = (sectionHits[f.label] ?? 0) + 1
       }
     }
@@ -193,12 +232,10 @@ export default function MonthHealthOverview({ petId, date, recordedDates }: Prop
   const urineDist     = countByValue(
     monthLogs.map(l => (l.urineStatus && !URINE_NORMAL.has(l.urineStatus) ? l.urineStatus : null))
   )
-  // 症狀觀察：各部位有觀察的天數
+  // 症狀觀察：各部位有「異常觀察」的天數（正常值不計，例如情緒「平靜放鬆」）
   const symptomDist: Array<[string, number]> = MULTI_FIELDS
     .map(f => {
-      const days = monthLogs.filter(
-        l => parseJson<string[]>(l[f.key] as string, []).length > 0
-      ).length
+      const days = monthLogs.filter(l => abnormalMultiValues(l, f).length > 0).length
       return [f.label, days] as [string, number]
     })
     .filter(([, days]) => days > 0)
@@ -210,7 +247,7 @@ export default function MonthHealthOverview({ petId, date, recordedDates }: Prop
   })()
 
   const dayObserved = dayLog
-    ? MULTI_FIELDS.filter(({ key }) => parseJson<string[]>(dayLog[key] as string, []).length > 0)
+    ? MULTI_FIELDS.filter(f => abnormalMultiValues(dayLog, f).length > 0)
     : []
 
   return (
@@ -233,14 +270,25 @@ export default function MonthHealthOverview({ petId, date, recordedDates }: Prop
           <p className="text-sm text-slate-400 text-center py-3">本月尚無健康紀錄</p>
         ) : (
           <div className="space-y-4">
+            {/* 白話摘要：區分「任何紀錄」與「健康日誌」兩種口徑，語意清楚 */}
+            <p className="text-sm text-[#2C1810] bg-[#FAF7F2] rounded-xl px-3 py-2.5 leading-relaxed">
+              本月 <span className="font-bold">{recordedCount}</span> 天有紀錄，其中
+              <span className="font-bold">{healthLogDays}</span> 天有健康日誌、
+              <span className="font-bold text-emerald-700">{healthyDays}</span> 天狀況良好
+              {abnormalDays > 0 && (
+                <>，<span className="font-bold text-amber-700">{abnormalDays}</span> 天有異常觀察</>
+              )}
+              。
+            </p>
+
             {/* 統計數字 */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-slate-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-black text-[#2C1810]">{recordedCount}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">記錄天數</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">健康日誌天數</p>
               </div>
               <div className="bg-emerald-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-black text-emerald-700">{recordedCount - abnormalDays}</p>
+                <p className="text-2xl font-black text-emerald-700">{healthyDays}</p>
                 <p className="text-[11px] text-emerald-600 mt-0.5">健康良好</p>
               </div>
               <div className={`rounded-xl p-3 text-center ${abnormalDays > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>

@@ -24,6 +24,15 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay()
 }
 
+// 由 YYYY-MM-DD 字串取得「該日所在週的週日（本地時間）」
+function startOfWeekFor(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() - date.getDay())
+  return date
+}
+
+
 // ─── 解析 AI 提取的成分字串（可能帶 ```json 標記）──────────────────────────────
 function parseIngredientText(raw: string | null | undefined): { ingredients: string[]; raw: string } | null {
   if (!raw) return null
@@ -54,14 +63,6 @@ interface PetProductEntry {
   productId: string
   listType: string
   product: Product
-}
-
-interface UsageRecord {
-  id: string
-  petId: string
-  date: string
-  notes?: string | null
-  product?: Product | null
 }
 
 interface PetInfo {
@@ -347,24 +348,32 @@ function DayDetail({ petId, date, onClose }: { petId: string; date: string; onCl
 
 // ─── Month calendar ───────────────────────────────────────────────────────────
 
-function MonthCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: Set<string>; petId: string; onDateSelect?: (date: string | null) => void }) {
+// 受控月曆：顯示月份（year/month）與選取日期(selectedDate)皆由父層持有，
+// 與「已紀錄圓點」資料源（recordedDates）及下方總覽共用同一份狀態。
+interface MonthCalendarProps {
+  recordedDates: Set<string>
+  petId: string
+  year: number
+  month: number
+  selectedDate: string | null
+  onSelectDate: (date: string | null) => void
+  onPrevMonth: () => void
+  onNextMonth: () => void
+}
+
+function MonthCalendar({ recordedDates, petId, year, month, selectedDate, onSelectDate, onPrevMonth, onNextMonth }: MonthCalendarProps) {
   const today = new Date()
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   function selectDate(key: string) {
-    const next = selectedDate === key ? null : key
-    setSelectedDate(next)
-    onDateSelect?.(next)
+    onSelectDate(selectedDate === key ? null : key)
   }
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfMonth(year, month)
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  const prevMonth = () => { setSelectedDate(null); if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
-  const nextMonth = () => { setSelectedDate(null); if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+  const prevMonth = () => onPrevMonth()
+  const nextMonth = () => onNextMonth()
 
   return (
     <div className="mb-4">
@@ -401,38 +410,57 @@ function MonthCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: 
           })}
         </div>
       </div>
-      {selectedDate && <DayDetail petId={petId} date={selectedDate} onClose={() => setSelectedDate(null)} />}
+      {selectedDate && <DayDetail petId={petId} date={selectedDate} onClose={() => onSelectDate(null)} />}
     </div>
   )
 }
 
 // ─── Week calendar ────────────────────────────────────────────────────────────
 
-function WeekCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: Set<string>; petId: string; onDateSelect?: (date: string | null) => void }) {
-  const today = new Date()
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay())
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const days = ['日', '一', '二', '三', '四', '五', '六']
+// 受控週曆：選取日期(selectedDate)由父層持有，與下方 HealthLogSection 連動；
+// 顯示週由 weekStart（該週週日）決定，可上一週／下一週切換。
+// 不再內建 DayDetail —— 當日紀錄改由頁面下方連動的 HealthLogSection 顯示，避免重複空區塊。
+interface WeekCalendarProps {
+  recordedDates: Set<string>
+  weekStart: Date
+  selectedDate: string
+  onSelectDate: (date: string) => void
+  onPrevWeek: () => void
+  onNextWeek: () => void
+}
 
-  function selectDate(key: string) {
-    const next = selectedDate === key ? null : key
-    setSelectedDate(next)
-    onDateSelect?.(next)
-  }
+// 將週範圍格式化為「M/D – M/D」
+function formatWeekRange(weekStart: Date): string {
+  const end = new Date(weekStart)
+  end.setDate(weekStart.getDate() + 6)
+  return `${weekStart.getMonth() + 1}/${weekStart.getDate()} – ${end.getMonth() + 1}/${end.getDate()}`
+}
+
+function WeekCalendar({ recordedDates, weekStart, selectedDate, onSelectDate, onPrevWeek, onNextWeek }: WeekCalendarProps) {
+  const today = new Date()
+  const days = ['日', '一', '二', '三', '四', '五', '六']
 
   return (
     <div className="mb-4">
-      <div className="flex justify-between items-center mb-3 bg-white border-2 border-slate-900/5 rounded-3xl p-4 shadow-sm relative overflow-hidden">
+      <div className="flex justify-between items-center mb-3 px-2">
+        <button onClick={onPrevWeek} className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-black transition-colors">
+          <ChevronLeft size={20} />
+        </button>
+        <span className="font-bold text-sm text-slate-900">{formatWeekRange(weekStart)}</span>
+        <button onClick={onNextWeek} className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-100 text-slate-500 hover:bg-slate-50 hover:text-black transition-colors">
+          <ChevronRight_Nav size={20} />
+        </button>
+      </div>
+      <div className="flex justify-between items-center bg-white border-2 border-slate-900/5 rounded-3xl p-4 shadow-sm relative overflow-hidden">
         {days.map((label, i) => {
-          const d = new Date(startOfWeek)
-          d.setDate(startOfWeek.getDate() + i)
+          const d = new Date(weekStart)
+          d.setDate(weekStart.getDate() + i)
           const isToday = d.toDateString() === today.toDateString()
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           const hasRec = recordedDates.has(key)
           const isSelected = key === selectedDate
           return (
-            <div key={i} onClick={() => selectDate(key)} className="flex flex-col items-center gap-2 relative z-10 cursor-pointer">
+            <div key={i} onClick={() => onSelectDate(key)} className="flex flex-col items-center gap-2 relative z-10 cursor-pointer">
               <span className="text-xs font-bold text-slate-400">{label}</span>
               <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all',
                 isSelected ? 'bg-[#D98A53] text-white shadow-md' : isToday ? 'bg-[#111111] text-white shadow-md' : 'text-slate-700 hover:bg-slate-100'
@@ -442,7 +470,6 @@ function WeekCalendar({ recordedDates, petId, onDateSelect }: { recordedDates: S
           )
         })}
       </div>
-      {selectedDate && <DayDetail petId={petId} date={selectedDate} onClose={() => setSelectedDate(null)} />}
     </div>
   )
 }
@@ -1207,9 +1234,18 @@ export default function DiaryPage() {
   const [hasPlan, setHasPlan]           = useState(false)
   const [planStart, setPlanStart]       = useState('')
 
-  // ─ Modal 開關 ──────────────────────────────────────────────────────────────
+  // ─ 月曆 / 週曆導覽 state ────────────────────────────────────────────────────
   const [calTab, setCalTab] = useState<'month' | 'week'>('month')
   const [monthSelectedDate, setMonthSelectedDate] = useState(today)
+
+  // 月曆顯示的年月（受控）；以今日所在月份為初始
+  const [calYear, setCalYear]   = useState(() => parseInt(today.slice(0, 4), 10))
+  const [calMonth, setCalMonth] = useState(() => parseInt(today.slice(5, 7), 10) - 1)
+  // 月曆內選取日期（null = 未選，不展開 DayDetail）
+  const [monthDayDetail, setMonthDayDetail] = useState<string | null>(null)
+
+  // 週曆顯示週的起始日（週日）；以今日所在週為初始
+  const [weekStart, setWeekStart] = useState(() => startOfWeekFor(today))
 
   const [showMedModal, setShowMedModal]     = useState(false)
   const [showGroomModal, setShowGroomModal] = useState(false)
@@ -1242,23 +1278,41 @@ export default function DiaryPage() {
       .catch(() => {})
   }, [petId])
 
-  // ─── 取本月記錄打點 ────────────────────────────────────────────────────────
+  // ─── 取記錄打點（聚合所有紀錄來源，月曆與週曆共用同一份 recordedDates）─────
+  // 月曆模式：取顯示月份；週曆模式：取顯示週可能跨到的月份（最多兩個）。
+  const [datesRefreshKey, setDatesRefreshKey] = useState(0)
+  const visibleYearMonths = (() => {
+    if (calTab === 'month') {
+      return [`${calYear}-${String(calMonth + 1).padStart(2, '0')}`]
+    }
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    const months = new Set<string>([
+      `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}`,
+      `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}`,
+    ])
+    return Array.from(months)
+  })()
+  const visibleYearMonthsKey = visibleYearMonths.join(',')
+
   useEffect(() => {
     if (!petId) return
-    const now = new Date()
-    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    fetch(`/api/usages?petId=${petId}&limit=100`)
-      .then(r => r.ok ? r.json() : [])
-      .then((data: UsageRecord[]) => {
-        const dates = new Set<string>(
-          data
-            .filter(u => u.date && u.date.startsWith(yearMonth))
-            .map(u => u.date.slice(0, 10)),
-        )
-        setRecordedDates(dates)
-      })
-      .catch(() => {})
-  }, [petId])
+    let cancelled = false
+    Promise.all(
+      visibleYearMonths.map(ym =>
+        fetch(`/api/diary-dates?petId=${petId}&yearMonth=${ym}`)
+          .then(r => (r.ok ? r.json() : { dates: [] }))
+          .then((d: { dates: string[] }) => d.dates)
+          .catch(() => [] as string[]),
+      ),
+    ).then(results => {
+      if (cancelled) return
+      setRecordedDates(new Set(results.flat()))
+    })
+    return () => { cancelled = true }
+    // visibleYearMonthsKey 已涵蓋 calTab / calMonth / weekStart 的變化
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [petId, visibleYearMonthsKey, datesRefreshKey])
 
   // ─── 換食計畫同步 localStorage ────────────────────────────────────────────
   const handleSetHasPlan = (v: boolean) => {
@@ -1290,9 +1344,35 @@ export default function DiaryPage() {
     dietRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // ─── Modal 回呼：儲存後刷新日曆打點 ──────────────────────────────────────
+  // ─── Modal 回呼：儲存後重新聚合日曆打點（涵蓋所有紀錄來源）──────────────
   const handleModalSaved = () => {
     setRecordedDates(prev => new Set([...prev, selectedDate]))
+    setDatesRefreshKey(k => k + 1)
+  }
+
+  // ─── 月曆換月（收合 DayDetail，並讓下方總覽跟著切到新月份）──────────────
+  const goToMonth = (year: number, month: number) => {
+    setCalYear(year)
+    setCalMonth(month)
+    setMonthDayDetail(null)
+    // 總覽的月份由 monthSelectedDate 推導，換月時對齊到新月份第一天
+    setMonthSelectedDate(`${year}-${String(month + 1).padStart(2, '0')}-01`)
+  }
+  const goPrevMonth = () => {
+    if (calMonth === 0) goToMonth(calYear - 1, 11)
+    else goToMonth(calYear, calMonth - 1)
+  }
+  const goNextMonth = () => {
+    if (calMonth === 11) goToMonth(calYear + 1, 0)
+    else goToMonth(calYear, calMonth + 1)
+  }
+
+  // ─── 週曆換週（上拋的 selectedDate 維持不變，僅切換顯示週）──────────────
+  const goPrevWeek = () => {
+    setWeekStart(prev => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d })
+  }
+  const goNextWeek = () => {
+    setWeekStart(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d })
   }
 
   return (
@@ -1300,8 +1380,8 @@ export default function DiaryPage() {
 
       {/* ─── 月曆 / 週曆 toggle（最頂部）────────────────────────────── */}
       <div className="flex bg-slate-100 p-1.5 rounded-full">
-        <button onClick={() => { setCalTab('month'); setSelectedDate(today) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
-        <button onClick={() => { setCalTab('week'); setSelectedDate(today) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
+        <button onClick={() => { setCalTab('month'); setMonthSelectedDate(today); setMonthDayDetail(null) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'month' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>月曆頁面</button>
+        <button onClick={() => { setCalTab('week'); setSelectedDate(today); setWeekStart(startOfWeekFor(today)) }} className={cn('flex-1 py-2 rounded-full text-sm font-bold transition-all', calTab === 'week' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black')}>週曆頁面</button>
       </div>
       {calTab === 'month' ? (
         <>
@@ -1309,22 +1389,30 @@ export default function DiaryPage() {
           <MonthCalendar
             recordedDates={recordedDates}
             petId={petId}
-            onDateSelect={(d) => setMonthSelectedDate(d ?? today)}
+            year={calYear}
+            month={calMonth}
+            selectedDate={monthDayDetail}
+            onSelectDate={(d) => { setMonthDayDetail(d); setMonthSelectedDate(d ?? today) }}
+            onPrevMonth={goPrevMonth}
+            onNextMonth={goNextMonth}
           />
           <MonthHealthOverview
             petId={petId}
             date={monthSelectedDate}
-            recordedDates={recordedDates}
+            recordedCount={recordedDates.size}
           />
         </>
       ) : (
         <>
           {/* ─── 週曆模式：週曆 + 記錄快捷 + 健康紀錄編輯區 ─────────── */}
-          {/* 週曆選取的日期上拋，驅動健康紀錄與評分卡的 date；取消選取則回到今日 */}
+          {/* 週曆選取的日期直接同步 selectedDate，驅動下方 HealthLogSection；不再內建重複的 DayDetail */}
           <WeekCalendar
             recordedDates={recordedDates}
-            petId={petId}
-            onDateSelect={(d) => setSelectedDate(d ?? today)}
+            weekStart={weekStart}
+            selectedDate={selectedDate}
+            onSelectDate={(d) => setSelectedDate(d)}
+            onPrevWeek={goPrevWeek}
+            onNextWeek={goNextWeek}
           />
           <DiaryTopBar
             onOpenMedication={() => setShowMedModal(true)}
