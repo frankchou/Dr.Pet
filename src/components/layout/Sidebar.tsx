@@ -41,26 +41,7 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
-  {
-    href: '/nutrition',
-    label: '營養分析',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
-        <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
-      </svg>
-    ),
-  },
-  {
-    href: '/nutritionist',
-    label: 'AI諮詢',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
-        <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-        <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-        <circle cx="20" cy="10" r="2" />
-      </svg>
-    ),
-  },
+  // 注意：營養分析 (/nutrition) 與 AI諮詢 (/nutritionist) 已從 nav 隱藏（保留頁面，日後可加回）
   {
     href: '/news',
     label: '快訊',
@@ -148,10 +129,10 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* 主導覽 */}
+      {/* 主導覽：毛孩 ｜ 飲食 ｜ 照相 ｜ 日誌 ｜ 快訊 */}
       <nav className="flex-1 px-4 space-y-1">
-        {/* 毛孩、飲食、日誌 */}
-        {NAV_ITEMS.slice(0, 3).map((item) => (
+        {/* 毛孩、飲食 */}
+        {NAV_ITEMS.slice(0, 2).map((item) => (
           <Link key={item.href} href={item.href} className={itemClass(item.href)}>
             {item.icon}
             {item.label}
@@ -170,8 +151,8 @@ export default function Sidebar() {
           照相
         </Link>
 
-        {/* 營養師、快訊 */}
-        {NAV_ITEMS.slice(3).map((item) => (
+        {/* 日誌、快訊 */}
+        {NAV_ITEMS.slice(2).map((item) => (
           <Link key={item.href} href={item.href} className={itemClass(item.href)}>
             {item.icon}
             {item.label}

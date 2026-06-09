@@ -25,6 +25,10 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+] as const
+
+// 注意：營養 (/nutrition) 與 AI諮詢 (/nutritionist) 已從 nav 隱藏（保留頁面，日後可加回）
+const RIGHT_NAV_ITEMS = [
   {
     href: '/diary',
     label: '日誌',
@@ -32,29 +36,6 @@ const NAV_ITEMS = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-      </svg>
-    ),
-  },
-] as const
-
-const RIGHT_NAV_ITEMS = [
-  {
-    href: '/nutrition',
-    label: '營養',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
-      </svg>
-    ),
-  },
-  {
-    href: '/nutritionist',
-    label: 'AI諮詢',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-        <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-        <circle cx="20" cy="10" r="2" />
       </svg>
     ),
   },
@@ -105,7 +86,7 @@ export default function BottomNav() {
       style={{ boxShadow: 'var(--pp-shadow-nav)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-end h-[60px]">
-        {/* 左側三個 tab */}
+        {/* 左側 tab：毛孩、飲食 */}
         {NAV_ITEMS.map((item) => (
           <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} />
         ))}
@@ -125,7 +106,7 @@ export default function BottomNav() {
           </Link>
         </div>
 
-        {/* 右側兩個 tab */}
+        {/* 右側 tab：日誌、快訊 */}
         {RIGHT_NAV_ITEMS.map((item) => (
           <NavItem key={item.href} href={item.href} icon={item.icon} label={item.label} />
         ))}

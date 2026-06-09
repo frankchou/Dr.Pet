@@ -378,11 +378,44 @@ interface PetCardProps {
   onSave: () => void
   onCancel?: () => void
   saving: boolean
+  /** 既有 pet 上傳頭像成功後立即持久化（新 pet 則於建立時一併儲存） */
+  onPersistAvatar: (url: string) => Promise<void>
 }
 
-function PetCard({ pet, onUpdate, onSave, onCancel, saving }: PetCardProps) {
+function PetCard({ pet, onUpdate, onSave, onCancel, saving, onPersistAvatar }: PetCardProps) {
   const inputCls =
     'w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#111111]/10 focus:outline-none transition-all'
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // 允許重複選同一檔
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setUploadError('請選擇圖片檔')
+      return
+    }
+    setUploadError(null)
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!res.ok) throw new Error('上傳失敗')
+      const data = await res.json() as { url?: string }
+      if (!data.url) throw new Error('上傳失敗')
+      onUpdate('avatar', data.url)
+      // 既有 pet 立即寫回；新 pet 待按「儲存檔案」建立時一併送出
+      if (!pet.isNew) await onPersistAvatar(data.url)
+    } catch {
+      setUploadError('頭像上傳失敗，請再試一次')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div data-pet-card className="w-[calc(100vw-3rem)] md:w-[600px] shrink-0">
@@ -405,15 +438,30 @@ function PetCard({ pet, onUpdate, onSave, onCancel, saving }: PetCardProps) {
               </span>
             )}
           </div>
-          {/* 上傳頭像暫時 disabled（TODO: 實作檔案上傳） */}
+          {/* 頭像上傳 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarSelect}
+          />
           <button
-            disabled
-            className="absolute bottom-0 right-0 w-10 h-10 bg-[#111111] text-white rounded-full flex items-center justify-center border-4 border-[#F4F7FB] shadow-sm opacity-40 cursor-not-allowed"
-            title="頭像上傳即將推出"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="absolute bottom-0 right-0 w-10 h-10 bg-[#111111] text-white rounded-full flex items-center justify-center border-4 border-[#F4F7FB] shadow-sm hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            title="上傳頭像"
           >
-            <SvgCamera />
+            {uploading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <SvgCamera />
+            )}
           </button>
         </div>
+        {uploadError && (
+          <p className="text-xs font-bold text-red-500 mb-2">{uploadError}</p>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -634,6 +682,7 @@ export default function SettingsPage() {
         birthday: pet.birthday || null,
         weight: pet.weight ? parseFloat(pet.weight) : null,
         isNeutered: pet.isNeutered,
+        avatar: pet.avatar ?? null,
       }
 
       if (pet.isNew) {
@@ -661,6 +710,21 @@ export default function SettingsPage() {
       showToast('儲存失敗，請再試一次')
     } finally {
       setSavingId(null)
+    }
+  }
+
+  // 既有 pet 上傳頭像後立即持久化（僅送 avatar 欄位，PUT 支援部分更新）
+  const persistAvatar = async (petId: string, url: string) => {
+    try {
+      const res = await fetch(`/api/pets/${petId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: url }),
+      })
+      if (!res.ok) throw new Error('儲存失敗')
+      showToast('頭像已更新')
+    } catch {
+      showToast('頭像儲存失敗，請再試一次')
     }
   }
 
@@ -789,6 +853,7 @@ export default function SettingsPage() {
                     onSave={() => savePet(pet)}
                     onCancel={pet.isNew ? () => cancelNewPet(pet.id) : undefined}
                     saving={savingId === pet.id}
+                    onPersistAvatar={(url) => persistAvatar(pet.id, url)}
                   />
                 ))}
 

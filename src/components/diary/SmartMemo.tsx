@@ -2,6 +2,38 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
+// Web Speech API 的型別（瀏覽器全域，TS lib 未內建）。僅宣告本檔用到的最小子集。
+interface SpeechRecognitionResultLike {
+  0: { transcript: string }
+  isFinal: boolean
+}
+interface SpeechRecognitionEventLike {
+  resultIndex: number
+  results: { length: number; [index: number]: SpeechRecognitionResultLike }
+}
+interface SpeechRecognitionErrorEventLike { error: string }
+interface SpeechRecognitionLike {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
+  onend: (() => void) | null
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor
+    webkitSpeechRecognition?: SpeechRecognitionCtor
+  }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
 interface ParsedRecord {
   type: 'symptom' | 'medication' | 'grooming' | 'health_metric' | 'food_note'
   label: string
@@ -83,6 +115,80 @@ export default function SmartMemo({ petId, date, onApplyToLog }: Props) {
   const [saved, setSaved]     = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // ─── 語音輸入（Web Speech API）─────────────────────────────────────────────
+  // 不支援的瀏覽器隱藏麥克風按鈕；listening 為錄音中狀態；voiceError 顯示權限等提示。
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [voiceError, setVoiceError] = useState('')
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  // 開始錄音前已存在的文字，作為附加新辨識結果的基底。
+  const baseTextRef = useRef('')
+
+  useEffect(() => {
+    setSpeechSupported(getSpeechRecognitionCtor() !== null)
+    // 卸載時中止辨識，避免殘留的麥克風佔用與 callback。
+    return () => { recognitionRef.current?.abort() }
+  }, [])
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop()
+  }, [])
+
+  const startListening = useCallback(() => {
+    const Ctor = getSpeechRecognitionCtor()
+    if (!Ctor || listening) return
+    setVoiceError('')
+
+    const recognition = new Ctor()
+    recognition.lang = 'zh-TW'
+    recognition.continuous = true
+    recognition.interimResults = true
+    baseTextRef.current = text ? text.trimEnd() + ' ' : ''
+
+    recognition.onresult = (event) => {
+      let finalChunk = ''
+      let interimChunk = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const transcript = result[0].transcript
+        if (result.isFinal) finalChunk += transcript
+        else interimChunk += transcript
+      }
+      if (finalChunk) baseTextRef.current += finalChunk
+      // 拼接 final + interim 填入隨記 textarea，並清除已過時的成功提示。
+      setText(baseTextRef.current + interimChunk)
+      setSaved(false)
+    }
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setVoiceError('麥克風權限被拒，請於瀏覽器設定開啟後再試')
+      } else if (event.error === 'no-speech') {
+        setVoiceError('沒有偵測到語音，請再試一次')
+      } else if (event.error !== 'aborted') {
+        setVoiceError('語音辨識發生問題，請改用文字輸入')
+      }
+    }
+    recognition.onend = () => {
+      setListening(false)
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+      setListening(true)
+    } catch {
+      // start() 在已啟動時會丟錯；視為無法啟動。
+      setListening(false)
+      recognitionRef.current = null
+    }
+  }, [text, listening])
+
+  const toggleListening = useCallback(() => {
+    if (listening) stopListening()
+    else startListening()
+  }, [listening, startListening, stopListening])
+
   // 文字變動後 debounce 800ms 自動打標籤
   const autoTag = useCallback(async (input: string) => {
     const trimmed = input.trim()
@@ -153,16 +259,34 @@ export default function SmartMemo({ petId, date, onApplyToLog }: Props) {
           rows={4}
           className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 text-sm font-medium resize-none focus:outline-none focus:border-[#C4714A]/40 transition-all placeholder:text-slate-400"
         />
-        {/* 語音按鈕（預留，尚未實作） */}
-        <button
-          type="button"
-          disabled
-          aria-label="語音輸入（即將開放）"
-          className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 cursor-not-allowed"
-        >
-          <MicIcon />
-        </button>
+        {/* 語音按鈕（Web Speech API；不支援的瀏覽器隱藏）*/}
+        {speechSupported && (
+          <button
+            type="button"
+            onClick={toggleListening}
+            aria-pressed={listening}
+            aria-label={listening ? '停止語音輸入' : '開始語音輸入'}
+            className={`absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${
+              listening
+                ? 'bg-[#C4714A] border-[#C4714A] text-white animate-pulse'
+                : 'bg-white border-slate-200 text-slate-400 hover:text-[#C4714A] hover:bg-slate-50'
+            }`}
+          >
+            <MicIcon />
+          </button>
+        )}
       </div>
+
+      {/* 錄音中 / 權限被拒等提示 */}
+      {listening && (
+        <div className="mt-2 flex items-center gap-2 text-xs font-bold text-[#C4714A]">
+          <span className="w-2 h-2 rounded-full bg-[#C4714A] animate-pulse" />
+          錄音中…說話後會自動填入，再次點擊麥克風可結束
+        </div>
+      )}
+      {voiceError && (
+        <div className="mt-2 text-xs font-bold text-red-500">{voiceError}</div>
+      )}
 
       {/* 字數 */}
       <div className="flex justify-end mt-1 mb-2">

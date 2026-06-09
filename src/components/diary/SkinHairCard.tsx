@@ -27,6 +27,17 @@ export const XSmallIcon = () => (
   </svg>
 )
 
+// 健康卡片右上角的相機圖示為「純裝飾」（待辦 3-9）：保留外觀、移除點擊功能。
+// 沿用原本 button 的圓底配色，但改為不可互動的 span。
+export const DecorIcon = () => (
+  <span
+    aria-hidden="true"
+    className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+  >
+    <CameraIcon />
+  </span>
+)
+
 // ─── 共用照片上傳 hook ─────────────────────────────────────────────────────────
 
 export function usePhotoUpload(photos: string[], onPhotosChange?: (urls: string[]) => void) {
@@ -120,6 +131,47 @@ export function PhotoStrip({ photos, onRemove }: PhotoStripProps) {
   )
 }
 
+// ─── 共用照片上傳區（明確入口）─────────────────────────────────────────────────
+// 待辦 3-9：右上角相機 icon 改為純裝飾後，上傳改由此處「＋ 新增照片」鈕觸發。
+// 沿用原本的上傳流程（hidden file input + handleFileChange）與 PhotoStrip 顯示。
+
+export interface PhotoUploaderProps {
+  photos: string[]
+  onPhotosChange?: (urls: string[]) => void
+}
+
+export function PhotoUploader({ photos, onPhotosChange }: PhotoUploaderProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { uploading, handleFileChange, removePhoto } = usePhotoUpload(photos, onPhotosChange)
+
+  if (!onPhotosChange) return null
+
+  return (
+    <div className="mt-3">
+      <PhotoStrip photos={photos} onRemove={removePhoto} />
+
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="mt-3 flex items-center gap-1.5 rounded-full border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors disabled:opacity-50"
+      >
+        <CameraIcon size={14} />
+        <span>{uploading ? '上傳中…' : '新增照片'}</span>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        capture="environment"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+    </div>
+  )
+}
+
 // ─── 卡片頂列（標題 + 右上 icon 按鈕）────────────────────────────────────────
 
 export interface CardHeaderProps {
@@ -169,9 +221,6 @@ const SKIN_OPTIONS = [
 // ─── SkinHairCard ─────────────────────────────────────────────────────────────
 
 export default function SkinHairCard({ value, onChange, photos = [], onPhotosChange }: MultiSelectCardProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { uploading, handleFileChange, removePhoto } = usePhotoUpload(photos, onPhotosChange)
-
   const toggle = (key: string) => {
     onChange(value.includes(key) ? value.filter(v => v !== key) : [...value, key])
   }
@@ -180,28 +229,7 @@ export default function SkinHairCard({ value, onChange, photos = [], onPhotosCha
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
       <CardHeader
         title="皮膚毛髮"
-        iconButton={
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              aria-label="上傳照片"
-            >
-              <CameraIcon />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </>
-        }
+        iconButton={<DecorIcon />}
       />
 
       <div className="flex flex-wrap gap-2">
@@ -216,7 +244,7 @@ export default function SkinHairCard({ value, onChange, photos = [], onPhotosCha
         ))}
       </div>
 
-      <PhotoStrip photos={photos} onRemove={removePhoto} />
+      <PhotoUploader photos={photos} onPhotosChange={onPhotosChange} />
     </div>
   )
 }

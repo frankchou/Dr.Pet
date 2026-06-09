@@ -19,6 +19,7 @@ import NeuroCard from '@/components/diary/NeuroCard'
 import ReproductiveCard from '@/components/diary/ReproductiveCard'
 import SmartMemo from '@/components/diary/SmartMemo'
 import type { RecordParam } from '@/hooks/useRecordParams'
+import type { DailyTask } from '@/hooks/useDailyTasks'
 
 interface DietValue {
   tab: 'all' | 'reduced' | 'forbidden'
@@ -82,9 +83,11 @@ interface Props {
   date: string
   petSex: string
   params?: RecordParam[]
+  dailyTasks: DailyTask[]
+  onOpenTaskSettings: () => void
 }
 
-export default function HealthLogSection({ petId, date, petSex, params = [] }: Props) {
+export default function HealthLogSection({ petId, date, petSex, params = [], dailyTasks, onOpenTaskSettings }: Props) {
   function show(id: string): boolean {
     if (params.length === 0) return true
     const p = params.find(x => x.id === id)
@@ -141,6 +144,8 @@ export default function HealthLogSection({ petId, date, petSex, params = [] }: P
         <DailyChecklist
           value={parseJson<string[]>(log.dailyChecklist, [])}
           onChange={(val) => patch({ dailyChecklist: JSON.stringify(val) })}
+          tasks={dailyTasks}
+          onOpenSettings={onOpenTaskSettings}
         />
       )}
 

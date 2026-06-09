@@ -6,6 +6,13 @@ import Image from 'next/image'
 import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import { parseJson, symptomTypeLabel } from '@/lib/utils'
 import IngredientAnalysis from '@/components/home/IngredientAnalysis'
+import EmergencyCareModal from '@/components/home/EmergencyCareModal'
+
+// ─── 功能旗標 ────────────────────────────────────────────────────────────────
+
+/** 健康檔案概覽「活力指數 / 水分攝取」兩張卡是否顯示。
+ *  待辦 3-10：先隱藏、保留程式碼，日後要開回來把此旗標改 true 即可。 */
+const SHOW_VITALITY_HYDRATION = false
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +145,45 @@ function SvgZap({ size = 18 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  )
+}
+
+// 待辦 3-6 快速入口圖示
+function SvgEye({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function SvgClipboardPlus({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  )
+}
+
+function SvgAsterisk({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <line x1="12" y1="4" x2="12" y2="20" />
+      <line x1="4.6" y1="7.8" x2="19.4" y2="16.2" />
+      <line x1="4.6" y1="16.2" x2="19.4" y2="7.8" />
+    </svg>
+  )
+}
+
+function SvgChevronRight({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   )
 }
@@ -307,6 +353,8 @@ export default function HomePage() {
   const [todayMealCount, setTodayMealCount] = useState<number>(0)
   const [medRecords, setMedRecords] = useState<MedicationRecord[]>([])
   const [groomingRecords, setGroomingRecords] = useState<GroomingRecord[]>([])
+  // 待辦 3-6：緊急協助 SOS 列表 modal 開關
+  const [showEmergencyCare, setShowEmergencyCare] = useState(false)
 
   // 載入寵物列表（共同飼主可能在另一端新增/編輯毛孩，故可被輪詢重抓）
   const fetchPets = useCallback(() => {
@@ -691,43 +739,49 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* 活力指數 */}
-              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                <IconChip bgColor="#FEF1E2" icon={
-                  <SvgZap size={24} />
-                } />
-                <div>
-                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">活力指數</h3>
-                  {loading ? (
-                    <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
-                  ) : healthMetric?.vitality ? (
-                    <HealthTag accent>
-                      {healthMetric.vitality === 'high' ? '活躍' : healthMetric.vitality === 'medium' ? '正常' : '低落'}
-                    </HealthTag>
-                  ) : (
-                    <span className="text-slate-400 text-sm">尚未記錄</span>
-                  )}
-                </div>
-              </div>
+              {/* 活力指數 / 水分攝取 — 暫時隱藏（待辦 3-10，保留程式碼，日後可開）。
+                  重啟方式：把下方 SHOW_VITALITY_HYDRATION 改為 true。 */}
+              {SHOW_VITALITY_HYDRATION && (
+                <>
+                  {/* 活力指數 */}
+                  <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <IconChip bgColor="#FEF1E2" icon={
+                      <SvgZap size={24} />
+                    } />
+                    <div>
+                      <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">活力指數</h3>
+                      {loading ? (
+                        <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+                      ) : healthMetric?.vitality ? (
+                        <HealthTag accent>
+                          {healthMetric.vitality === 'high' ? '活躍' : healthMetric.vitality === 'medium' ? '正常' : '低落'}
+                        </HealthTag>
+                      ) : (
+                        <span className="text-slate-400 text-sm">尚未記錄</span>
+                      )}
+                    </div>
+                  </div>
 
-              {/* 水分攝取 */}
-              <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-                <IconChip bgColor="#EDF3FB" icon={
-                  <SvgDroplets size={24} />
-                } />
-                <div>
-                  <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">水分攝取</h3>
-                  {loading ? (
-                    <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
-                  ) : healthMetric?.waterIntake ? (
-                    <HealthTag accent>
-                      {healthMetric.waterIntake === 'high' ? '偏多' : healthMetric.waterIntake === 'medium' ? '正常' : '偏少'}
-                    </HealthTag>
-                  ) : (
-                    <span className="text-slate-400 text-sm">尚未記錄</span>
-                  )}
-                </div>
-              </div>
+                  {/* 水分攝取 */}
+                  <div className="bg-white border-2 border-slate-900/5 rounded-[28px] p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <IconChip bgColor="#EDF3FB" icon={
+                      <SvgDroplets size={24} />
+                    } />
+                    <div>
+                      <h3 className="font-bold text-lg mb-2 text-slate-800 leading-tight">水分攝取</h3>
+                      {loading ? (
+                        <div className="h-6 w-16 bg-slate-100 rounded-full animate-pulse" />
+                      ) : healthMetric?.waterIntake ? (
+                        <HealthTag accent>
+                          {healthMetric.waterIntake === 'high' ? '偏多' : healthMetric.waterIntake === 'medium' ? '正常' : '偏少'}
+                        </HealthTag>
+                      ) : (
+                        <span className="text-slate-400 text-sm">尚未記錄</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
@@ -886,8 +940,68 @@ export default function HomePage() {
                 <SvgArrowUpRight />
               </div>
             </Link>
+
+            {/* 待辦 3-6：快速入口三卡 */}
+            {/* 日查觀察表 → 日誌週曆模式的當日健康紀錄 */}
+            <Link
+              href="/diary?view=week"
+              className="w-full text-left bg-white rounded-[28px] p-4 flex items-center justify-between group hover:shadow-md transition-shadow shadow-sm"
+            >
+              <div className="flex items-center gap-4">
+                <IconChip icon={<SvgEye size={26} />} bgColor="#EFEAE4" />
+                <div>
+                  <h4 className="font-bold text-lg text-slate-900 leading-tight">日查觀察表</h4>
+                  <p className="text-xs font-bold tracking-wider text-slate-400 mt-0.5">DAILY OBSERVATION FORM</p>
+                </div>
+              </div>
+              <span className="text-slate-300 group-hover:text-slate-400 transition-colors shrink-0">
+                <SvgChevronRight />
+              </span>
+            </Link>
+
+            {/* 就醫記錄表 → 週曆模式並自動開啟「用藥看診」modal */}
+            <Link
+              href="/diary?view=week&open=medication"
+              className="w-full text-left bg-white rounded-[28px] p-4 flex items-center justify-between group hover:shadow-md transition-shadow shadow-sm"
+            >
+              <div className="flex items-center gap-4">
+                <IconChip icon={<SvgClipboardPlus size={26} />} bgColor="#EFEAE4" />
+                <div>
+                  <h4 className="font-bold text-lg text-slate-900 leading-tight">就醫記錄表</h4>
+                  <p className="text-xs font-bold tracking-wider text-slate-400 mt-0.5">MEDICAL VISIT RECORD</p>
+                </div>
+              </div>
+              <span className="text-slate-300 group-hover:text-slate-400 transition-colors shrink-0">
+                <SvgChevronRight />
+              </span>
+            </Link>
+
+            {/* 緊急協助 SOS（紅底強調）→ 開全台緊急照護列表 modal */}
+            <button
+              type="button"
+              onClick={() => setShowEmergencyCare(true)}
+              className="w-full text-left bg-[#B5462F] rounded-[28px] p-4 flex items-center justify-between group hover:bg-[#A23E29] transition-colors shadow-lg shadow-[#B5462F]/20"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-[20px] flex items-center justify-center shrink-0 bg-white/15 text-white">
+                  <SvgAsterisk size={26} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg text-white leading-tight">緊急協助</h4>
+                  <p className="text-xs font-bold tracking-wider text-white/70 mt-0.5">EMERGENCY ASSISTANCE SOS</p>
+                </div>
+              </div>
+              <span className="text-white/70 group-hover:text-white transition-colors shrink-0">
+                <SvgChevronRight />
+              </span>
+            </button>
           </div>
         </div>
+      )}
+
+      {/* 待辦 3-6：緊急協助 SOS 列表 modal */}
+      {showEmergencyCare && (
+        <EmergencyCareModal onClose={() => setShowEmergencyCare(false)} />
       )}
     </div>
   )

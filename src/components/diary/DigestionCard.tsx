@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useRef } from 'react'
-import { CameraIcon, CardHeader, MultiSelectCardProps, Pill, PhotoStrip, usePhotoUpload } from './SkinHairCard'
+import React from 'react'
+import { CardHeader, DecorIcon, MultiSelectCardProps, Pill, PhotoUploader } from './SkinHairCard'
 
 // ─── 消化異常 Pill 圖示 ───────────────────────────────────────────────────────
 
@@ -32,9 +32,6 @@ const DIGESTION_OPTIONS = [
 ]
 
 export default function DigestionCard({ value, onChange, photos = [], onPhotosChange }: MultiSelectCardProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { uploading, handleFileChange, removePhoto } = usePhotoUpload(photos, onPhotosChange)
-
   const toggle = (key: string) => {
     onChange(value.includes(key) ? value.filter(v => v !== key) : [...value, key])
   }
@@ -43,28 +40,7 @@ export default function DigestionCard({ value, onChange, photos = [], onPhotosCh
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
       <CardHeader
         title="消化異常"
-        iconButton={
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              aria-label="上傳照片"
-            >
-              <CameraIcon />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </>
-        }
+        iconButton={<DecorIcon />}
       />
 
       <div className="flex flex-wrap gap-2">
@@ -79,7 +55,7 @@ export default function DigestionCard({ value, onChange, photos = [], onPhotosCh
         ))}
       </div>
 
-      <PhotoStrip photos={photos} onRemove={removePhoto} />
+      <PhotoUploader photos={photos} onPhotosChange={onPhotosChange} />
     </div>
   )
 }

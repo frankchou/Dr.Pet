@@ -541,7 +541,12 @@ function SessionAccordion({
             </div>
           ) : (
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setShowForm(true)
+                // 預設展開的時段（如早餐）不會經過 toggle，計畫可能還沒建立 →
+                // 點「繼續添加項目」時若尚無 planId 就主動觸發建立，避免無限轉圈。
+                if (!planId) onRetryPlan()
+              }}
               className="w-full py-3 border border-dashed border-slate-300 rounded-2xl text-sm font-bold text-slate-500 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors flex items-center justify-center gap-1.5"
             >
               <Plus size={14} />
