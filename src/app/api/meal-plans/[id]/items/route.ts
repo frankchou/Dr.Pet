@@ -59,6 +59,48 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
   }
 }
 
+export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  try {
+    const { id: planId } = await context.params
+
+    const authSession = await auth()
+    const access = await requirePetAccessByRecord('dailyMealPlan', planId, authSession?.user?.id ?? '')
+    if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    const body = await request.json() as { itemId?: string; quantity?: number }
+    const { itemId, quantity } = body
+
+    if (!itemId) {
+      return NextResponse.json({ error: 'itemId is required' }, { status: 400 })
+    }
+
+    // 數量驗證：必須是 > 0 且 <= 9999 的有限數字（API 為信任邊界，前端可被繞過）
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0 || quantity > 9999) {
+      return NextResponse.json({ error: 'quantity must be a positive number between 0 and 9999' }, { status: 400 })
+    }
+
+    // 確認 item 屬於該 plan，防止越權修改
+    const item = await prisma.mealPlanItem.findFirst({
+      where: { id: itemId, planId },
+    })
+
+    if (!item) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+    }
+
+    const updated = await prisma.mealPlanItem.update({
+      where: { id: itemId },
+      data: { quantity },
+      include: { product: true },
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('PATCH /api/meal-plans/[id]/items error:', error)
+    return NextResponse.json({ error: 'Failed to update meal plan item' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
     const { id: planId } = await context.params

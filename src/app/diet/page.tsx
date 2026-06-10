@@ -7,10 +7,17 @@ import type { DietAnalysisResult } from '@/app/api/diet-analysis/route'
 import DietSwitchPlan from '@/components/diary/DietSwitchPlan'
 import DailyReactionCard from '@/components/diary/DailyReactionCard'
 import AddItemModal from '@/components/diary/AddItemModal'
+import IngredientAnalysis from '@/components/home/IngredientAnalysis'
+import CorrelationInsights from '@/components/nutrition/CorrelationInsights'
+import AlternativeRecommendations from '@/components/nutrition/AlternativeRecommendations'
 
 // 產品評分（「吃後感想」）為 v1 功能，現版暫時隱藏、保留待未來啟用。
 // 其歸屬為飲食頁；要重新啟用把此旗標改為 true 即可。見 docs/未來功能.md。
 const SHOW_PRODUCT_REACTIONS: boolean = false
+
+// AI 產品替代推薦（AlternativeRecommendations）— frank 決定先隱藏。
+// 元件保留不刪，未來要啟用把此旗標改為 true 即可。
+const SHOW_ALTERNATIVE_RECS: boolean = false
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -125,17 +132,49 @@ const SESSION_META: Record<Session, { label: string; en: string; icon: React.Rea
 
 const SESSIONS: Session[] = ['morning', 'noon', 'evening']
 
-// 詳細報告九大項目：標題固定（對照 diet-ai-analysis-report-01~05），內容由 AI 生成
-const DETAIL_REPORT_ITEMS: Array<{ key: keyof DietAnalysisResult['detailedReport']; title: string }> = [
-  { key: 'nutritionStandard', title: '國際營養基準比對' },
-  { key: 'hydration', title: '水分攝取預估參照' },
-  { key: 'dietaryRestrictions', title: '專屬飲食限制對照' },
-  { key: 'ingredientScience', title: '成分學理客觀標註' },
-  { key: 'foodSafetyAlert', title: '官方食安通報同步' },
-  { key: 'drugFoodInteraction', title: '潛在藥食關聯提示' },
-  { key: 'calorieCalculation', title: '動態熱量變數試算' },
-  { key: 'foodTransition', title: '換食過渡配比推估' },
-  { key: 'logCorrelation', title: '日誌時序關聯比對' },
+// 比較兩份配餐計畫是否實質相同（供輪詢 silent 重抓時避免無謂重繪）。
+// 以 plan id 與各品項的關鍵欄位（id/數量/單位/克數/標籤/名稱）做穩定比較，
+// 僅在伺服器回傳內容真的有變動時才更新 state。
+function isSamePlan(a: MealPlan | null, b: MealPlan | null): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  if (a.id !== b.id) return false
+  if (a.items.length !== b.items.length) return false
+  // 依 id 排序後逐項比對，避免後端回傳順序差異造成誤判
+  const sortById = (items: MealPlanItem[]) => [...items].sort((x, y) => x.id.localeCompare(y.id))
+  const ax = sortById(a.items)
+  const bx = sortById(b.items)
+  for (let i = 0; i < ax.length; i++) {
+    const ai = ax[i]
+    const bi = bx[i]
+    if (
+      ai.id !== bi.id ||
+      ai.session !== bi.session ||
+      ai.quantity !== bi.quantity ||
+      ai.unit !== bi.unit ||
+      ai.estimatedGrams !== bi.estimatedGrams ||
+      ai.tags !== bi.tags ||
+      (ai.product?.name ?? ai.customName ?? '') !== (bi.product?.name ?? bi.customName ?? '')
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+// AI 運算準則說明（固定靜態文案，demo / 真實一致）。
+// 沿用九大項標題；說明文字為精簡專業的「準則說明」，取代原由 AI 生成的 detailedReport，
+// 改由報告右上角「分析準則」按鈕開啟的固定彈窗呈現。
+const ANALYSIS_CRITERIA: Array<{ title: string; desc: string }> = [
+  { title: '國際營養基準比對', desc: '以乾物質比 (DMB) 換算各項數據，對照 AAFCO 與 NRC 權威指引，客觀評估是否符合毛孩年齡階段的基礎營養需求。' },
+  { title: '水分攝取預估參照', desc: '依體重精算每日基礎需水量，並比對配餐乾濕食佔比的含水量，預估水分缺口以協助泌尿道與腎臟保健。' },
+  { title: '專屬飲食限制對照', desc: '依檔案設定攔截已知過敏原，並針對腎臟病控磷、心臟病低鈉、結石控鎂鈣等特殊需求進行數值超標預警。' },
+  { title: '成分學理客觀標註', desc: '依 WSAVA 營養指南與臨床毒理文獻，中立標示爭議性人工添加物，並標註具實證的機能性原料供長期選購參考。' },
+  { title: '官方食安通報同步', desc: '定期對接 FDA、TFDA 等官方公開資訊，配餐若含近期通報下架或配方異動商品，即時發出風險提示。' },
+  { title: '潛在藥食關聯提示', desc: '依檔案中註記的藥物療程，評估配餐特定營養素是否影響藥效，輔助錯開餵食時間（實際給藥請遵獸醫醫囑）。' },
+  { title: '動態熱量變數試算', desc: '結合活動量與環境變數估算每日熱量需求，於極端氣溫或活動量明顯變化時動態提出總熱量微調建議。' },
+  { title: '換食過渡配比推估', desc: '追蹤新商品引入天數與比例，換食幅度過大時依獸醫常規發出腸胃不適預警，並產出 7 天漸進換食配比建議。' },
+  { title: '日誌時序關聯比對', desc: '比對日誌異常與近期飲食變更：腸胃異常回溯近 48 小時、皮膚 / 淚腺溯源近 14 天，提取潛在飲食關聯供參考。' },
 ]
 
 const HOT_SEARCH_CHIPS = ['鱈魚原肉配方', '深海起司罐身', '去皮鮮嫩乾糧']
@@ -252,6 +291,51 @@ interface SessionAccordionProps {
   onRetryPlan: () => void
   onItemAdded: (item: MealPlanItem) => void
   onItemDeleted: (itemId: string) => void
+  onItemQuantityChanged: (itemId: string, quantity: number) => void
+}
+
+// 展開狀態下可編輯的配餐數量輸入框。
+// 採本地暫存值，於 onBlur / Enter 觸發儲存（樂觀更新由父層處理）；
+// 失焦或送出時若為空 / 非正數，回填原數量，避免存入無效值。
+function QuantityInput({
+  value,
+  onCommit,
+}: {
+  value: number
+  onCommit: (next: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+
+  // 外部數量變動（含回滾）時同步顯示值
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+
+  const commit = () => {
+    const next = Number(draft)
+    if (!Number.isFinite(next) || next <= 0) {
+      setDraft(String(value))
+      return
+    }
+    onCommit(next)
+  }
+
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min={0.5}
+      step={0.5}
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      className="w-12 px-1 py-2 bg-white border border-slate-200 rounded-xl text-center text-base font-bold text-slate-900 tabular-nums outline-none focus:ring-2 focus:ring-[#FDDFC8] focus:border-[#FDDFC8] transition-all"
+      aria-label="配餐數量"
+    />
+  )
 }
 
 function SessionAccordion({
@@ -266,6 +350,7 @@ function SessionAccordion({
   onRetryPlan,
   onItemAdded,
   onItemDeleted,
+  onItemQuantityChanged,
 }: SessionAccordionProps) {
   const [showModal, setShowModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -288,6 +373,26 @@ function SessionAccordion({
   const handleItemAdded = (item: MealPlanItem) => {
     onItemAdded(item)
     // 加入後不關閉 modal，允許連續加入多項（設計圖為持續搜尋選取）
+  }
+
+  // 配餐數量編輯：樂觀更新先寫入 UI，PATCH 失敗則回滾並提示。
+  const handleQuantityChange = async (item: MealPlanItem, next: number) => {
+    if (!planId) return
+    if (!Number.isFinite(next) || next <= 0) return
+    if (next === item.quantity) return
+    const prev = item.quantity
+    onItemQuantityChanged(item.id, next)
+    try {
+      const res = await fetch(`/api/meal-plans/${planId}/items`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id, quantity: next }),
+      })
+      if (!res.ok) throw new Error('update failed')
+    } catch {
+      onItemQuantityChanged(item.id, prev)
+      alert('更新數量失敗，請稍後再試')
+    }
   }
 
   return (
@@ -381,11 +486,12 @@ function SessionAccordion({
                         )}
                       </div>
 
-                      {/* 數量框 + 單位 + 刪除 */}
+                      {/* 數量框（可編輯）+ 單位 + 刪除 */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="min-w-[2.75rem] px-2 py-2 bg-white border border-slate-200 rounded-xl text-center text-base font-bold text-slate-900 tabular-nums">
-                          {item.quantity}
-                        </span>
+                        <QuantityInput
+                          value={item.quantity}
+                          onCommit={(next) => void handleQuantityChange(item, next)}
+                        />
                         <span className="text-sm text-slate-500 font-medium w-7">{item.unit}</span>
                         <button
                           onClick={() => handleDelete(item.id)}
@@ -508,21 +614,22 @@ function NutrientBar({ label, value, max, color, unit = '%', displayValue }: Nut
   )
 }
 
-// ─── 詳細報告 Modal ───────────────────────────────────────────────────────────
+// ─── 分析準則固定彈窗（6-4a）─────────────────────────────────────────────────
+// 內容固定寫死（demo / 真實一致）：系統分析基礎宣告 + 九大運算準則靜態說明。
+// 由報告右上角「分析準則」按鈕開啟，取代原由 AI 生成的九大項報告。
 
-interface DetailedReportModalProps {
-  report: DietAnalysisResult['detailedReport']
+interface AnalysisCriteriaModalProps {
   onClose: () => void
 }
 
-function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
+function AnalysisCriteriaModal({ onClose }: AnalysisCriteriaModalProps) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/50 flex items-end justify-center" onClick={onClose}>
       <div
         className="bg-white rounded-t-3xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Modal 標題（對照 report-01：圖示 + 中文標題 + 英文副標 + 關閉鈕） */}
+        {/* 標題（對照 report-01：圖示 + 中文標題 + 英文副標 + 關閉鈕） */}
         <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[#2C2C2E] flex items-center justify-center shrink-0">
@@ -532,9 +639,9 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-black text-lg text-[#2C1810] leading-tight">全域綜合飲食分析報告</h2>
+              <h2 className="font-black text-lg text-[#2C1810] leading-tight">AI 分析準則說明</h2>
               <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5 leading-tight">
-                GLOBAL DIETARY<br />COMPREHENSIVE REPORT
+                ANALYSIS CRITERIA
               </p>
             </div>
             <button
@@ -549,7 +656,7 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
 
         {/* 捲動內容 */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-          {/* 系統分析基礎宣告 */}
+          {/* 系統分析基礎宣告（固定文案） */}
           <div className="bg-[#2C2C2E] text-white rounded-3xl p-5">
             <div className="flex items-center gap-2 mb-2.5">
               <svg viewBox="0 0 24 24" fill="#E08A4F" stroke="none" width={18} height={18}>
@@ -558,7 +665,7 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
               <p className="text-sm font-bold">系統分析基礎宣告</p>
             </div>
             <p className="text-sm leading-relaxed text-slate-200">
-              本系統依據您設定的毛孩專屬健康檔案、目前飲食與日誌，透過以下 9 大客觀數據進行綜合交叉分析：
+              本系統依據您設定的毛孩專屬健康檔案、目前飲食與日誌，透過以下 9 大客觀數據進行綜合交叉分析。所有結果僅供參考，無法取代專業獸醫師之診斷與處置。
             </p>
           </div>
 
@@ -568,23 +675,107 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
             <div className="h-px bg-gradient-to-r from-slate-300 to-transparent" />
           </div>
 
-          {/* 9 大分項（編號圓圈 + 標題 + 斜體灰內容，對照 report-01~05） */}
+          {/* 9 大分項（編號圓圈 + 標題 + 固定說明） */}
           <div className="space-y-7">
-            {DETAIL_REPORT_ITEMS.map(({ key, title }, idx) => (
-              <div key={key} className="flex gap-4">
+            {ANALYSIS_CRITERIA.map(({ title, desc }, idx) => (
+              <div key={title} className="flex gap-4">
                 <span className="w-10 h-10 rounded-full bg-[#2C2C2E] text-white text-sm font-bold flex items-center justify-center shrink-0">
                   {idx + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-900 text-base mb-2">{title}</p>
-                  <p className="text-sm leading-relaxed text-slate-400 italic">{report[key]}</p>
+                  <p className="text-sm leading-relaxed text-slate-400">{desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 底部：版本標記 + 確認鈕（對照 report 各圖底部） */}
+        {/* 底部：版本標記 + 確認鈕 */}
+        <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold text-slate-300 tracking-wider">AI SYNTHESIS CRITERIA</span>
+          <button
+            onClick={onClose}
+            className="px-6 py-3 bg-[#2C2C2E] text-white font-bold rounded-full text-sm hover:bg-[#1c1c1e] transition-colors"
+          >
+            確認並關閉
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── 全域綜合飲食分析報告 Modal（6-4b）────────────────────────────────────────
+// 報告本體＝成分綜合分析的豐富格式（IngredientAnalysis：風險統計/風險總覽/營養表/
+// 補充建議/AI 營養安全風險）＋ AI 產品替代推薦（AlternativeRecommendations）＋
+// 最下方 AI 關聯分析（CorrelationInsights）。右上角「分析準則」按鈕開啟固定說明彈窗。
+
+interface DetailedReportModalProps {
+  petId: string | null
+  onClose: () => void
+}
+
+function DetailedReportModal({ petId, onClose }: DetailedReportModalProps) {
+  const [showCriteria, setShowCriteria] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-3xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal 標題（圖示 + 中文標題 + 英文副標 + 分析準則鈕 + 關閉鈕） */}
+        <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-start gap-2">
+            <div className="w-12 h-12 rounded-2xl bg-[#2C2C2E] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+                <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6 7 18.2l1.9-5.8L4 8.8h6.1L12 3z" />
+                <circle cx="18.5" cy="5.5" r="1.5" fill="#fff" stroke="none" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-black text-lg text-[#2C1810] leading-tight">全域綜合飲食分析報告</h2>
+              <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5 leading-tight">
+                GLOBAL DIETARY<br />COMPREHENSIVE REPORT
+              </p>
+            </div>
+            {/* 分析準則按鈕（右上角，關閉鈕左側） */}
+            <button
+              onClick={() => setShowCriteria(true)}
+              className="h-9 px-3 rounded-full bg-[#FEF1E2] text-[#C4714A] text-xs font-bold flex items-center gap-1.5 hover:bg-[#FDDFC8] transition-colors shrink-0"
+              aria-label="查看分析準則"
+            >
+              <InfoIcon size={14} />
+              分析準則
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors shrink-0"
+              aria-label="關閉"
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* 捲動內容：成分綜合分析 + 替代品推薦 + AI 關聯分析 */}
+        <div className="flex-1 overflow-y-auto px-5 pb-5">
+          {petId ? (
+            <>
+              {/* 成分綜合分析（風險統計/風險總覽/營養表/補充建議/AI 營養安全風險） */}
+              <IngredientAnalysis petId={petId} />
+              {/* AI 產品替代推薦（針對有毒 / 警示產品）— 暫時隱藏（SHOW_ALTERNATIVE_RECS） */}
+              {SHOW_ALTERNATIVE_RECS && <AlternativeRecommendations petId={petId} />}
+              {/* AI 關聯分析（症狀 × 飲食） */}
+              <CorrelationInsights petId={petId} />
+            </>
+          ) : (
+            <p className="text-sm text-slate-400 text-center py-10">尚未選擇毛孩</p>
+          )}
+        </div>
+
+        {/* 底部：版本標記 + 確認鈕 */}
         <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex items-center justify-between gap-3">
           <span className="text-[11px] font-bold text-slate-300 tracking-wider">AI SYNTHESIS REPORT V2.4</span>
           <button
@@ -595,6 +786,8 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
           </button>
         </div>
       </div>
+
+      {showCriteria && <AnalysisCriteriaModal onClose={() => setShowCriteria(false)} />}
     </div>
   )
 }
@@ -815,7 +1008,7 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
         {/* AI 專家點評 */}
         <div className="bg-[#FAF7F2] rounded-2xl p-4 mb-4">
           <p className="text-[10px] font-black text-[#C4714A] tracking-wider mb-1.5">AI 專家點評</p>
-          <p className="text-sm text-slate-700 leading-relaxed font-medium">"{result.expertComment}"</p>
+          <p className="text-sm text-slate-700 leading-relaxed font-medium">&quot;{result.expertComment}&quot;</p>
         </div>
 
         {/* 配餐優化建議卡（對照 diet-ai-analysis-03~06：標題列 + AI 輔助徽章 + 四分類標籤 + 內容） */}
@@ -1079,7 +1272,7 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
       {/* 詳細報告 Modal */}
       {showModal && (
         <DetailedReportModal
-          report={result.detailedReport}
+          petId={petId}
           onClose={() => setShowModal(false)}
         />
       )}
@@ -1122,7 +1315,9 @@ export default function DietPage() {
       const res = await fetch(`/api/meal-plans?petId=${pid}&date=${todayStr}`)
       if (res.ok) {
         const data = await res.json() as MealPlan | null
-        setPlan(data)
+        // silent（輪詢）重抓時先比對內容，無實際變動就不 setPlan，
+        // 避免每次輪詢都產生全新物件造成無謂重繪/閃爍（aiResult 為獨立 state，不受影響）。
+        setPlan(prev => (silent && isSamePlan(prev, data) ? prev : data))
       }
     } catch {
       // 靜默降級
@@ -1210,6 +1405,16 @@ export default function DietPage() {
     setPlan(prev => {
       if (!prev) return prev
       return { ...prev, items: prev.items.filter(it => it.id !== itemId) }
+    })
+  }, [])
+
+  const handleItemQuantityChanged = useCallback((itemId: string, quantity: number) => {
+    setPlan(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        items: prev.items.map(it => (it.id === itemId ? { ...it, quantity } : it)),
+      }
     })
   }, [])
 
@@ -1339,6 +1544,7 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  onItemQuantityChanged={handleItemQuantityChanged}
                   petId={petId}
                   addedNames={addedNames}
                 />
@@ -1352,6 +1558,7 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  onItemQuantityChanged={handleItemQuantityChanged}
                   petId={petId}
                   addedNames={addedNames}
                 />
@@ -1365,6 +1572,7 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  onItemQuantityChanged={handleItemQuantityChanged}
                   petId={petId}
                   addedNames={addedNames}
                 />
@@ -1432,6 +1640,7 @@ interface SessionAccordionWithPlanProps {
   onEnsurePlan: () => Promise<string | null>
   onItemAdded: (item: MealPlanItem) => void
   onItemDeleted: (itemId: string) => void
+  onItemQuantityChanged: (itemId: string, quantity: number) => void
 }
 
 function SessionAccordionWithPlan({
@@ -1446,23 +1655,22 @@ function SessionAccordionWithPlan({
   onEnsurePlan,
   onItemAdded,
   onItemDeleted,
+  onItemQuantityChanged,
 }: SessionAccordionWithPlanProps) {
-  // 確保使用者點擊展開後，若 plan 還不存在，先 POST 建立再展開
-  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(plan?.id ?? null)
+  // 本地剛建立的 planId（尚未經外部 plan prop 回傳前的暫存）。
+  // 實際使用的 planId 以外部 plan?.id 為優先，於 render 期間直接衍生，
+  // 不在 effect 內 setState（避免 react-hooks/set-state-in-effect）。
+  const [localPlanId, setLocalPlanId] = useState<string | null>(null)
+  const resolvedPlanId = plan?.id ?? localPlanId
   // 建立配餐計畫失敗時的錯誤訊息（前端硬化：不再無限轉圈，改顯示錯誤＋可重試）
   const [planError, setPlanError] = useState<string | null>(null)
-
-  // plan 從外部傳入時同步更新
-  useEffect(() => {
-    if (plan?.id) setResolvedPlanId(plan.id)
-  }, [plan?.id])
 
   // 嘗試建立配餐計畫；失敗時記錄錯誤供 UI 顯示與重試
   const tryEnsurePlan = useCallback(async () => {
     setPlanError(null)
     const pid = await onEnsurePlan()
     if (pid) {
-      setResolvedPlanId(pid)
+      setLocalPlanId(pid)
     } else {
       setPlanError('建立配餐計畫失敗，請檢查網路後重試')
     }
@@ -1491,6 +1699,7 @@ function SessionAccordionWithPlan({
       onRetryPlan={() => void tryEnsurePlan()}
       onItemAdded={onItemAdded}
       onItemDeleted={onItemDeleted}
+      onItemQuantityChanged={onItemQuantityChanged}
     />
   )
 }

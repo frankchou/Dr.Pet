@@ -4,6 +4,8 @@ import { analyzeIngredients } from '@/lib/ingredientAnalyzer'
 import { parseJson } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
+import { DEMO_ANALYSIS } from '@/lib/demoAnalysis'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +19,11 @@ export async function GET(request: NextRequest) {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：回固定示意分析結果（依「demo 全 mock」原則，雖為規則式分析仍不跑真資料）。
+    if (isDemoUser(session)) {
+      return NextResponse.json(DEMO_ANALYSIS)
+    }
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) {

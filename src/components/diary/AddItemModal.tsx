@@ -140,7 +140,17 @@ const Spinner = ({ className = '' }: { className?: string }) => (
 // ─── 成分展開細節（detail-info-1/2 圖）────────────────────────────────────────
 // 方案 B：只顯示 AI 真實回傳（detail）有值的欄位；缺漏（null / 空陣列）→ 整段隱藏，不造假。
 
-function DetailSections({ detail }: { detail: WebProductDetailed['detail'] }) {
+function DetailSections({
+  detail,
+  onReport,
+  reporting,
+  reported,
+}: {
+  detail: WebProductDetailed['detail']
+  onReport: () => void
+  reporting: boolean
+  reported: boolean
+}) {
   // AI 只回基本資料時，展開區可能完全沒有可顯示內容 → 顯示「無資料」而非空白破版。
   const hasAnyDetail =
     !!detail.fullIngredients ||
@@ -255,13 +265,20 @@ function DetailSections({ detail }: { detail: WebProductDetailed['detail'] }) {
       )}
 
       {/* 錯誤回報 */}
-      <button
-        type="button"
-        onClick={() => alert('已收到錯誤回報，我們會盡快核對此產品資料。')}
-        className="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors"
-      >
-        <AlertIcon size={13} /> 錯誤回報
-      </button>
+      {reported ? (
+        <p className="text-xs font-bold text-emerald-600">
+          已收到錯誤回報，我們會盡快核對此產品資料。
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={onReport}
+          disabled={reporting}
+          className="flex items-center gap-1.5 border border-slate-200 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+        >
+          {reporting ? <Spinner className="text-slate-400 w-3.5 h-3.5 border" /> : <AlertIcon size={13} />} 錯誤回報
+        </button>
+      )}
     </div>
   )
 }
@@ -273,10 +290,21 @@ interface CardProps {
   isAdded: boolean
   adding: boolean
   onAdd: () => void
+  onReport: (product: DisplayProduct) => Promise<boolean>
 }
 
-function ProductCard({ product, isAdded, adding, onAdd }: CardProps) {
+function ProductCard({ product, isAdded, adding, onAdd, onReport }: CardProps) {
   const [expanded, setExpanded] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState(false)
+
+  const handleReport = async () => {
+    if (reporting || reported) return
+    setReporting(true)
+    const ok = await onReport(product)
+    setReporting(false)
+    if (ok) setReported(true)
+  }
 
   const detail = product.detail
   const typeLabel = TYPE_LABEL[product.type] ?? '其他'
@@ -374,7 +402,12 @@ function ProductCard({ product, isAdded, adding, onAdd }: CardProps) {
             )}
           </>
         ) : (
-          <DetailSections detail={detail} />
+          <DetailSections
+            detail={detail}
+            onReport={() => void handleReport()}
+            reporting={reporting}
+            reported={reported}
+          />
         )}
       </div>
 
@@ -473,43 +506,65 @@ export default function AddItemModal({ planId, session, petId, addedNames, onAdd
     return () => clearTimeout(t)
   }, [query, category, runSearch])
 
+  // 標準化產品：建立 Product（綁 productId），讓營養/成分分析能對應真實產品。
+  // detail 即 AI 真實回傳（缺漏欄位為 null / 空陣列），缺漏就留空/不存，不寫任何示意值。
+  // 失敗回 null（呼叫端可降級為 customName）。
+  const createStandardizedProduct = async (product: DisplayProduct): Promise<string | null> => {
+    const raw = product.detail
+    // ingredientJson 只放真實有值的欄位，空陣列 / 空字串不落地
+    const ingredientJson: Record<string, unknown> = {}
+    if (product.ingredients.length > 0) ingredientJson.ingredients = product.ingredients
+    if (raw.certifications.length > 0) ingredientJson.certifications = raw.certifications
+    if (raw.nutritionFacts.length > 0) ingredientJson.nutritionFacts = raw.nutritionFacts
+    if (raw.dataSources.length > 0) ingredientJson.dataSources = raw.dataSources
+
+    try {
+      const pres = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: product.type || 'other',
+          name: product.name,
+          brand: product.brand || null,
+          variant: raw.variant ?? null,
+          ingredientText: raw.fullIngredients ?? raw.ingredientSummary ?? null,
+          ingredientJson,
+        }),
+      })
+      if (pres.ok) {
+        const created = await pres.json() as { id?: string }
+        return created.id ?? null
+      }
+    } catch {
+      // 標準化失敗 → 回 null
+    }
+    return null
+  }
+
+  // 錯誤回報：先確保有標準化 Product（回報需綁 productId），再送出回報。
+  // 後端所有帳號（含 demo）皆寫入 DB 並寄信通知。回傳是否成功供卡片切換已回報狀態。
+  const handleReport = async (product: DisplayProduct): Promise<boolean> => {
+    const productId = await createStandardizedProduct(product)
+    if (!productId) return false
+    try {
+      const res = await fetch('/api/product-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
   // 加入標準化產品：先建立 / 取得 PetProduct（綁定 productId），再寫入 mealPlanItem
   const handleAdd = async (product: DisplayProduct) => {
     if (!planId) return
     setAddingName(product.name)
     setError('')
     try {
-      // 1. 標準化產品：建立 Product（綁 productId），讓營養/成分分析能對應真實產品。
-      //    detail 即 AI 真實回傳（缺漏欄位為 null / 空陣列），缺漏就留空/不存，不寫任何示意值。
-      const raw = product.detail
-      // ingredientJson 只放真實有值的欄位，空陣列 / 空字串不落地
-      const ingredientJson: Record<string, unknown> = {}
-      if (product.ingredients.length > 0) ingredientJson.ingredients = product.ingredients
-      if (raw.certifications.length > 0) ingredientJson.certifications = raw.certifications
-      if (raw.nutritionFacts.length > 0) ingredientJson.nutritionFacts = raw.nutritionFacts
-      if (raw.dataSources.length > 0) ingredientJson.dataSources = raw.dataSources
-
-      let productId: string | null = null
-      try {
-        const pres = await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: product.type || 'other',
-            name: product.name,
-            brand: product.brand || null,
-            variant: raw.variant ?? null,
-            ingredientText: raw.fullIngredients ?? raw.ingredientSummary ?? null,
-            ingredientJson,
-          }),
-        })
-        if (pres.ok) {
-          const created = await pres.json() as { id?: string }
-          productId = created.id ?? null
-        }
-      } catch {
-        // 標準化失敗則降級為 customName，仍可加入品項
-      }
+      const productId = await createStandardizedProduct(product)
 
       // 1b. 同時加入該毛孩試用清單（綁 PetProduct），讓產品管理頁也看得到
       if (productId && petId) {
@@ -585,10 +640,10 @@ export default function AddItemModal({ planId, session, petId, addedNames, onAdd
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex flex-col justify-end"
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-t-3xl max-h-[90dvh] flex flex-col w-full max-w-[480px] mx-auto">
+      <div className="bg-white rounded-3xl max-h-[90dvh] flex flex-col w-full max-w-[480px] mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
           <span className="font-bold text-lg text-[#2C1810]">添加配餐項目</span>
@@ -602,8 +657,7 @@ export default function AddItemModal({ planId, session, petId, addedNames, onAdd
         </div>
 
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pt-4"
-          style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pt-4 pb-6"
         >
           {/* 搜尋框 */}
           <div className="relative">
@@ -670,6 +724,7 @@ export default function AddItemModal({ planId, session, petId, addedNames, onAdd
                   isAdded={addedNames.has(p.name)}
                   adding={addingName === p.name}
                   onAdd={() => void handleAdd(p)}
+                  onReport={handleReport}
                 />
               ))}
             </div>

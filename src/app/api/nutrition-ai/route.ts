@@ -98,8 +98,12 @@ export async function GET(request: NextRequest) {
 
     if (!saved) return NextResponse.json(null)
 
+    // 舊紀錄 / 格式異常可能缺漏陣列欄位，正規化後回傳，避免前端 crash。
+    const parsed = JSON.parse(saved.resultJson)
     return NextResponse.json({
-      ...JSON.parse(saved.resultJson),
+      overall: typeof parsed.overall === 'string' ? parsed.overall : '',
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      generalRecommendations: Array.isArray(parsed.generalRecommendations) ? parsed.generalRecommendations : [],
       savedAt: saved.createdAt,
       productCount: saved.productCount,
     })
@@ -239,7 +243,14 @@ status 值只能是以下四種：
     const jsonMatch = content.text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('AI 回應格式錯誤')
 
-    const analysis = JSON.parse(jsonMatch[0])
+    const parsed = JSON.parse(jsonMatch[0])
+    // 正規化形狀：AI 可能回傳缺漏 items / generalRecommendations 的物件，
+    // 統一補成陣列，確保落庫與 GET 回傳形狀完整，前端不會在 undefined 上 crash。
+    const analysis = {
+      overall: typeof parsed.overall === 'string' ? parsed.overall : '',
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      generalRecommendations: Array.isArray(parsed.generalRecommendations) ? parsed.generalRecommendations : [],
+    }
 
     // ── Step 2: 用詳細資料再生成重點摘要 ──────────────────────────────────────
     try {

@@ -158,6 +158,18 @@ model Product {
   communityRecsFor   CommunityRec[] @relation("BadProduct")
   communityRecsRec   CommunityRec[] @relation("RecommendedProduct")
   mealPlanItems      MealPlanItem[]
+  errorReports       ProductErrorReport[]
+}
+
+// 使用者回報產品資料有誤（飲食頁產品卡片「錯誤回報」）
+model ProductErrorReport {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  note      String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
 }
 
 model ProductUsage {

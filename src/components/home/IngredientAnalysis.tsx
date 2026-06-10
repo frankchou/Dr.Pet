@@ -399,7 +399,7 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
     const nutrients = (() => {
       const merged: Record<string, { total: number; unit: string }> = {}
       for (const pn of nutritionByProduct) {
-        for (const f of pn.facts) {
+        for (const f of pn.facts ?? []) {
           if (!merged[f.name]) merged[f.name] = { total: 0, unit: f.unit }
           merged[f.name].total += f.value
         }
@@ -574,7 +574,7 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
               }
               const merged: Record<string, number> = {}
               for (const pn of nutritionByProduct) {
-                for (const f of pn.facts) {
+                for (const f of pn.facts ?? []) {
                   merged[f.name] = (merged[f.name] || 0) + f.value
                 }
               }
@@ -732,12 +732,13 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
             type MergedNutrient = { name: string; total: number; unit: string; sources: string[]; range: string; warn: boolean; caution: boolean }
             const merged: Record<string, MergedNutrient> = {}
             for (const pn of nutritionByProduct) {
-              for (const f of pn.facts) {
+              const sourceName = pn.productName ?? '未命名產品'
+              for (const f of pn.facts ?? []) {
                 if (!merged[f.name]) {
                   merged[f.name] = { name: f.name, total: 0, unit: f.unit, sources: [], range: RANGES[f.name]?.range ?? '—', warn: false, caution: false }
                 }
                 merged[f.name].total += f.value
-                if (!merged[f.name].sources.includes(pn.productName)) merged[f.name].sources.push(pn.productName)
+                if (!merged[f.name].sources.includes(sourceName)) merged[f.name].sources.push(sourceName)
               }
             }
             const rows = Object.values(merged).map(r => {
@@ -746,7 +747,7 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
               const caution = !warn && cfg?.cautionAbove != null && r.total > cfg.cautionAbove
               return { ...r, warn, caution }
             })
-            const withNutrition = nutritionByProduct.filter(p => p.facts.length > 0)
+            const withNutrition = nutritionByProduct.filter(p => (p.facts?.length ?? 0) > 0)
             return (
               <>
                 <div className="bg-[#FEF1E2] border border-[#F3D9BE] rounded-2xl p-4">
@@ -822,7 +823,11 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
           )}
 
           {nutritionAi && (() => {
-            const hasRisk = nutritionAi.items.some(i => i.status === 'warning' || i.status === 'danger')
+            // 防護：已儲存紀錄 / AI 回傳形狀可能不完整（缺 items / generalRecommendations），
+            // 缺漏時以空陣列代替，避免 .some / .map / .length 在 undefined 上 crash。
+            const aiItems = nutritionAi.items ?? []
+            const aiGeneralRecs = nutritionAi.generalRecommendations ?? []
+            const hasRisk = aiItems.some(i => i.status === 'warning' || i.status === 'danger')
             const savedDate = nutritionAi.savedAt
               ? new Date(nutritionAi.savedAt).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
               : null
@@ -847,23 +852,25 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
                   {savedDate && (
                     <p className="text-[11px] font-bold text-slate-400 mb-2">上次分析：{savedDate}</p>
                   )}
-                  <p className="text-sm font-medium text-slate-700 leading-relaxed">{nutritionAi.overall}</p>
+                  <p className="text-sm font-medium text-slate-700 leading-relaxed">{nutritionAi.overall ?? ''}</p>
                 </div>
 
-                {/* 各營養素分析 */}
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-slate-500">各營養素分析</p>
-                  {nutritionAi.items.map((item, i) => (
-                    <NutrientCard key={i} item={item} />
-                  ))}
-                </div>
+                {/* 各營養素分析（無資料時略過此區） */}
+                {aiItems.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-bold text-slate-500">各營養素分析</p>
+                    {aiItems.map((item, i) => (
+                      <NutrientCard key={i} item={item} />
+                    ))}
+                  </div>
+                )}
 
                 {/* 整體建議 */}
-                {nutritionAi.generalRecommendations.length > 0 && (
+                {aiGeneralRecs.length > 0 && (
                   <div className="bg-white rounded-2xl border border-slate-100 p-4">
                     <p className="font-bold text-slate-800 mb-3">整體建議</p>
                     <ul className="space-y-2">
-                      {nutritionAi.generalRecommendations.map((rec, i) => (
+                      {aiGeneralRecs.map((rec, i) => (
                         <li key={i} className="flex gap-2 text-sm font-medium text-slate-600 leading-relaxed">
                           <span className="text-[#D98A53] shrink-0 mt-0.5">•</span>
                           <span>{rec}</span>
