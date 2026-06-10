@@ -80,6 +80,35 @@ interface NutritionAiResult {
 
 const A_REFS = '世界動物衛生組織、世界獸醫協會、WSAVA、CAPC、OFA、APOP、NRC、AAFCO（美國飼料管理協會）、FEDIAF、PNA、AAVN、Waltham Petcare Science Institute、農業部動植物防疫檢疫署、農業部食品藥物管理署、農業部、中華民國獸醫師公會全國聯合會、台灣小動物獸醫學會、台灣獸醫內科醫學會、台灣獸醫外科醫學會、國立臺灣大學獸醫專業學院、國立中興大學獸醫學系'
 
+// ─── 營養素門檻（與 /analysis 完整規則一致）─────────────────────────────────
+// 每 100g 乾物質的建議範圍（%）。min: AAFCO 最低需求（低於=不足）；warn: 超過此值=偏高。
+// 犬貓各自一組門檻；缺 min 表示無下限參考、缺 warn 表示無上限參考。
+type SpeciesThreshold = { min?: number; warn?: number }
+const NUTRIENT_THRESHOLDS: Record<string, { dog?: SpeciesThreshold; cat?: SpeciesThreshold }> = {
+  '粗蛋白': { dog: { min: 18, warn: 40 }, cat: { min: 26, warn: 55 } },
+  '粗脂肪': { dog: { min: 5.5, warn: 25 }, cat: { min: 9, warn: 35 } },
+  '粗纖維': { dog: { warn: 8 }, cat: { warn: 8 } },
+  '水分':   { dog: { warn: 78 }, cat: { warn: 78 } },
+  '鈉':     { dog: { min: 0.08, warn: 0.5 }, cat: { min: 0.2, warn: 0.8 } },
+  '鈣':     { dog: { min: 0.5, warn: 2.5 }, cat: { min: 0.3, warn: 2.0 } },
+  '磷':     { dog: { min: 0.4, warn: 1.6 }, cat: { min: 0.5, warn: 2.0 } },
+}
+
+// 中文 species → dog/cat（犬/狗→dog、貓→cat，無法判斷時預設 dog）
+function resolveSpecies(species: string | undefined): 'dog' | 'cat' {
+  if (species && species.includes('貓')) return 'cat'
+  return 'dog'
+}
+
+// 用 min/warn 組出可讀的建議範圍字串（如「≥18% <40%」）
+function formatRange(t: SpeciesThreshold | undefined): string {
+  if (!t) return '—'
+  const parts: string[] = []
+  if (t.min != null) parts.push(`≥${t.min}%`)
+  if (t.warn != null) parts.push(`<${t.warn}%`)
+  return parts.length > 0 ? parts.join(' ') : '—'
+}
+
 // ─── Inline SVG 圖示（lucide 風格）──────────────────────────────────────────
 
 function IconClipboardList() {
@@ -177,7 +206,7 @@ function IconBarChart({ size = 14 }: { size?: number }) {
 
 // ─── 小元件 ──────────────────────────────────────────────────────────────────
 
-type BadgeKind = 'caution' | 'safe' | 'warn' | 'note'
+type BadgeKind = 'caution' | 'safe' | 'warn' | 'note' | 'low'
 
 function ABadge({ kind, children }: { kind: BadgeKind; children: React.ReactNode }) {
   const colorMap: Record<BadgeKind, string> = {
@@ -185,6 +214,7 @@ function ABadge({ kind, children }: { kind: BadgeKind; children: React.ReactNode
     safe: 'bg-[#DCFCE7] text-[#16A34A]',
     warn: 'bg-[#FFEDD5] text-[#C2410C]',
     note: 'bg-[#FEF9C3] text-[#854D0E]',
+    low: 'bg-[#DBEAFE] text-[#1D4ED8]',
   }
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${colorMap[kind]}`}>
@@ -722,30 +752,28 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
             </div>
           ) : (() => {
             // 聚合所有產品的營養素（同名加總，記錄來源）
-            const RANGES: Record<string, { range: string; warnAbove?: number; cautionAbove?: number }> = {
-              '粗灰分': { range: '—', warnAbove: 8 },
-              '鈣':     { range: '≥0.5% <2.5%', cautionAbove: 1.2 },
-              '磷':     { range: '≥0.4% <1.6%' },
-              '鈉':     { range: '≥0.08% <0.5%' },
-              '粗纖維': { range: '<8%' },
-            }
-            type MergedNutrient = { name: string; total: number; unit: string; sources: string[]; range: string; warn: boolean; caution: boolean }
+            // 門檻採 /analysis 完整規則（7 種、犬貓各自 min/warn），依當前寵物 species 取對應組。
+            const speciesKey = resolveSpecies(pet.species)
+            type MergedNutrient = { name: string; total: number; unit: string; sources: string[] }
             const merged: Record<string, MergedNutrient> = {}
             for (const pn of nutritionByProduct) {
               const sourceName = pn.productName ?? '未命名產品'
               for (const f of pn.facts ?? []) {
                 if (!merged[f.name]) {
-                  merged[f.name] = { name: f.name, total: 0, unit: f.unit, sources: [], range: RANGES[f.name]?.range ?? '—', warn: false, caution: false }
+                  merged[f.name] = { name: f.name, total: 0, unit: f.unit, sources: [] }
                 }
                 merged[f.name].total += f.value
                 if (!merged[f.name].sources.includes(sourceName)) merged[f.name].sources.push(sourceName)
               }
             }
+            // 對每個營養素同時判斷偏高（>warn）與偏低（<min），介於之間為正常；無門檻者狀態為「—」。
             const rows = Object.values(merged).map(r => {
-              const cfg = RANGES[r.name]
-              const warn = cfg?.warnAbove != null && r.total > cfg.warnAbove
-              const caution = !warn && cfg?.cautionAbove != null && r.total > cfg.cautionAbove
-              return { ...r, warn, caution }
+              const t = NUTRIENT_THRESHOLDS[r.name]?.[speciesKey]
+              const hasThreshold = !!t
+              const high = !!(t?.warn != null && r.total > t.warn)
+              const low = !high && !!(t?.min != null && r.total < t.min)
+              const range = formatRange(t)
+              return { ...r, hasThreshold, high, low, range }
             })
             const withNutrition = nutritionByProduct.filter(p => (p.facts?.length ?? 0) > 0)
             return (
@@ -775,8 +803,8 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
                       {rows.map((r) => (
                         <tr key={r.name} className="text-sm">
                           <td className="px-4 py-2.5 font-bold text-slate-700">{r.name}</td>
-                          <td className={`px-2 py-2.5 font-bold ${r.warn ? 'text-[#C2410C]' : r.caution ? 'text-[#CA8A04]' : 'text-slate-900'}`}>
-                            {r.total}{r.unit}{r.warn ? ' ⚠️' : ''}
+                          <td className={`px-2 py-2.5 font-bold ${r.high ? 'text-[#C2410C]' : r.low ? 'text-[#1D4ED8]' : 'text-slate-900'}`}>
+                            {r.total}{r.unit}{r.high ? ' ⚠️' : r.low ? ' ▾' : ''}
                           </td>
                           <td className="px-2 py-2.5 hidden sm:table-cell">
                             {r.sources.map(s => (
@@ -785,16 +813,20 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
                           </td>
                           <td className="px-2 py-2.5 text-[11px] font-medium text-slate-400">{r.range}</td>
                           <td className="px-3 py-2.5 text-right">
-                            <ABadge kind={r.warn ? 'warn' : r.caution ? 'note' : 'safe'}>
-                              {r.warn ? '警示' : r.caution ? '留意' : '正常'}
-                            </ABadge>
+                            {!r.hasThreshold ? (
+                              <span className="text-[11px] font-bold text-slate-300">—</span>
+                            ) : (
+                              <ABadge kind={r.high ? 'warn' : r.low ? 'low' : 'safe'}>
+                                {r.high ? '警示' : r.low ? '不足' : '正常'}
+                              </ABadge>
+                            )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   <p className="text-[11px] font-medium text-slate-400 px-4 py-3">
-                    * 無 AAFCO 對照標準的營養素僅顯示合計值，可透過 AI 分析獲得建議
+                    * 門檻依{speciesKey === 'cat' ? '貓' : '犬'}的 AAFCO 標準對照；無對照標準的營養素僅顯示合計值（狀態「—」），可透過 AI 分析獲得建議
                   </p>
                 </div>
               </>
@@ -892,9 +924,10 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
           <div className="bg-white rounded-2xl border border-slate-100 p-4">
             <p className="font-bold text-slate-800 mb-2 text-sm">說明</p>
             <ul className="text-xs font-medium text-slate-500 leading-relaxed space-y-1">
-              <li>· 合計值為各產品標示值直接加總，代表最高負荷上限估算</li>
-              <li>· <span className="text-[#C2410C] font-bold">橘色/偏高</span>：超過 AAFCO 建議上限</li>
-              <li>· <span className="text-blue-500 font-bold">藍色/偏低</span>：低於 AAFCO 最低需求</li>
+              <li>· 合計值為各產品標示值直接加總，代表最高負荷上限估算，實際依產品說明為準</li>
+              <li>· <span className="text-[#C2410C] font-bold">橘色/警示</span>：合計超過 AAFCO 建議上限</li>
+              <li>· <span className="text-[#1D4ED8] font-bold">藍色/不足</span>：標示加總低於 AAFCO 最低需求，僅供參考</li>
+              <li>· 門檻依當前寵物物種（犬/貓）分別對照</li>
               <li>· AI 分析結合寵物體型與物種，提供個人化建議，僅供參考</li>
               <li>※ AAFCO = 美國飼料管理協會（Association of American Feed Control Officials）</li>
             </ul>
