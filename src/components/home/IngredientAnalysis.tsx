@@ -521,6 +521,8 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
           {/* 寵物頭像：優先用照片 */}
           <div className="w-12 h-12 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center text-[#D98A53] font-bold text-lg shrink-0 border border-slate-900/5">
             {pet.avatar
+              // 寵物頭像為使用者上傳 / data URL，尺寸不定且僅顯示於 48px 容器，維持 <img>
+              // eslint-disable-next-line @next/next/no-img-element
               ? <img src={pet.avatar} alt={pet.name} className="w-full h-full object-cover" />
               : pet.name.charAt(0)
             }

@@ -184,6 +184,8 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
     const sig = `${petId}|${yearMonth}`
     const silent = sig === lastFetchSigRef.current
     lastFetchSigRef.current = sig
+    // 非靜默更新時觸發非同步抓取，setLoading 為與外部 fetch 同步的載入旗標
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!silent) setLoading(true)
     fetch(`/api/daily-health-log?petId=${petId}&yearMonth=${yearMonth}`)
       .then(r => r.ok ? r.json() : [])
@@ -199,6 +201,8 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
     const sig = `${petId}|${date}`
     const silent = sig === lastDaySigRef.current
     lastDaySigRef.current = sig
+    // 切換日期（非靜默）時先清空再以 fetch 結果覆寫，屬與外部資料同步
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!silent) setDayLog(null)
     fetch(`/api/daily-health-log?petId=${petId}&date=${date}`)
       .then(r => r.ok ? r.json() : null)
@@ -223,6 +227,8 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
     if (!petId) return
     // 無健康日誌不顯示 AI 解讀
     if (monthLogs.length === 0) {
+      // 依當月資料是否為空重置 AI 解讀狀態，屬與外部資料（monthLogs）同步
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAiSummary(null)
       setAiError(false)
       lastAiSigRef.current = null

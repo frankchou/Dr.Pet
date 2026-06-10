@@ -69,7 +69,9 @@ export default function Sidebar() {
   const [currentPetId, setCurrentPetId] = useState<string>('')
 
   useEffect(() => {
+    // localStorage 僅存在於 client，惰性初始化會造成 SSR/hydration 不一致，故於 effect 水合
     const stored = localStorage.getItem('drpet_nickname')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) setNickname(stored)
     // 初始化目前選中寵物
     const storedPetId = localStorage.getItem('drpet_currentPetId')
@@ -228,6 +230,8 @@ export default function Sidebar() {
         >
           <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 flex-shrink-0 border-2 border-white shadow-sm">
             {avatarUrl
+              // 使用者頭像為 Google 遠端圖（需 referrerPolicy=no-referrer，next/image 不支援該屬性），維持 <img>
+              // eslint-disable-next-line @next/next/no-img-element
               ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               : <span className="w-full h-full flex items-center justify-center text-sm font-bold text-[#D98A53] bg-[#FFE8D6]">{displayName.charAt(0)}</span>
             }

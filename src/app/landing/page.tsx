@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import '../globals.css'
 
 export const metadata: Metadata = {
@@ -199,15 +200,15 @@ export default function LandingPage() {
               <a href="#faq" className="hover:text-black transition-colors">常見問題</a>
             </nav>
             <div className="flex items-center gap-3">
-              <a href="/" className="text-sm font-bold text-slate-700 hover:text-black transition-colors">
+              <Link href="/" className="text-sm font-bold text-slate-700 hover:text-black transition-colors">
                 登入
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/"
                 className="bg-[#111] text-white text-sm font-bold rounded-full px-5 py-2.5 hover:bg-black transition-colors"
               >
                 免費開始
-              </a>
+              </Link>
             </div>
           </div>
         </header>
@@ -228,12 +229,12 @@ export default function LandingPage() {
                 拍照，就知道這碗飼料適不適合你的毛孩。成分判讀、過敏風險、換食計畫，AI 一次搞定。
               </p>
               <div className="flex flex-wrap gap-3 mt-8">
-                <a
+                <Link
                   href="/"
                   className="bg-[#111] text-white font-bold rounded-2xl px-8 py-4 text-lg hover:bg-black transition-colors shadow-xl shadow-black/15"
                 >
                   免費開始使用 →
-                </a>
+                </Link>
                 <a
                   href="#how"
                   className="bg-white/60 backdrop-blur text-[#3A332C] font-bold rounded-2xl px-8 py-4 text-lg hover:bg-white transition-colors border border-white/60"
@@ -442,12 +443,12 @@ export default function LandingPage() {
             <p className="text-slate-400 font-bold mb-9 max-w-md mx-auto relative">
               用 Google 帳號免費開始，幾秒鐘就能分析第一份飼料。
             </p>
-            <a
+            <Link
               href="/"
               className="inline-block bg-white text-[#111] font-bold text-lg rounded-2xl px-10 py-4 hover:bg-slate-100 transition-colors relative"
             >
               免費開始使用 →
-            </a>
+            </Link>
           </div>
         </section>
 
@@ -472,9 +473,9 @@ export default function LandingPage() {
               </svg>
               <span className="font-bold">PurePaw 無敏毛孩</span>
             </div>
-            <a href="/" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
+            <Link href="/" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
               登入系統 →
-            </a>
+            </Link>
           </div>
           <p className="text-xs font-medium text-slate-400 leading-relaxed max-w-3xl mb-3">
             <strong className="text-slate-500">免責聲明：</strong>

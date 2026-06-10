@@ -8,7 +8,9 @@ export default function NutritionPage() {
   const [petId, setPetId] = useState('')
 
   useEffect(() => {
+    // localStorage 僅存在於 client，惰性初始化會造成 SSR/hydration 不一致，故於 effect 水合
     const stored = localStorage.getItem('drpet_currentPetId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) setPetId(stored)
 
     const onStorage = (e: StorageEvent) => {

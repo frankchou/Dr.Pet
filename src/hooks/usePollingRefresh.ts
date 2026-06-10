@@ -21,8 +21,11 @@ import { useEffect, useRef } from 'react'
 export function usePollingRefresh(refresh: () => void, intervalMs = 25000): void {
   // 用 ref 保存最新的 refresh，listener / interval 內永遠呼叫到最新版本，
   // 避免把 refresh 放進 effect 相依而頻繁重建計時器。
+  // 於 effect（每次 render 後）更新 ref，避免在 render 期間寫入 ref。
   const refreshRef = useRef(refresh)
-  refreshRef.current = refresh
+  useEffect(() => {
+    refreshRef.current = refresh
+  })
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null

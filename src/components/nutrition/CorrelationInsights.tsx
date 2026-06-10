@@ -35,6 +35,8 @@ export default function CorrelationInsights({ petId }: { petId: string }) {
 
   useEffect(() => {
     if (!petId) return
+    // 切換寵物時觸發非同步抓取，setLoading/setLoaded 為與外部 fetch 同步的載入旗標
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     setLoaded(false)
     fetch(`/api/analyze?petId=${petId}`)

@@ -51,7 +51,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // All hooks must be before any conditional return
   useEffect(() => {
+    // localStorage 僅存在於 client，惰性初始化會造成 SSR/hydration 不一致，故於 effect 水合
     const stored = localStorage.getItem('drpet_nickname')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) setNickname(stored)
     const storedPetId = localStorage.getItem('drpet_currentPetId')
     if (storedPetId) setCurrentPetId(storedPetId)
@@ -138,6 +140,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE8D6] flex items-center justify-center shadow-sm border border-white/50 pointer-events-auto cursor-pointer"
                 >
                   {avatarUrl
+                    // 使用者頭像為 Google 遠端圖（需 referrerPolicy=no-referrer，next/image 不支援該屬性），維持 <img>
+                    // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     : <span className="text-sm font-bold text-[#D98A53]">{displayName.charAt(0)}</span>
                   }

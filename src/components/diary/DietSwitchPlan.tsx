@@ -363,9 +363,11 @@ export default function DietSwitchPlan({ petId }: Props) {
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
+    // localStorage 僅存在於 client，惰性初始化會造成 SSR/hydration 不一致，故於 effect 水合
     const plan  = localStorage.getItem('drpet_hasPlan')
     const start = localStorage.getItem('drpet_planStart')
     if (plan === 'true' && start) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasPlan(true)
       setPlanStart(start)
     }

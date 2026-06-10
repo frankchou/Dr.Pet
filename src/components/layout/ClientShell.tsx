@@ -47,7 +47,9 @@ function DisclaimerModal({ onAgree }: { onAgree: () => void }) {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    // 依掛載後量測的 DOM 尺寸決定是否可同意，屬與外部系統（DOM 佈局）同步
     if (el.scrollHeight - el.clientHeight < 16) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanAgree(true)
     }
   }, [])
@@ -318,8 +320,10 @@ export default function ClientShell({ children }: { children: React.ReactNode })
   const [isPublicPath, setIsPublicPath] = useState(false)
 
   useEffect(() => {
+    // window.location 僅存在於 client，於掛載後判定是否為公開路徑（避免 SSR mismatch）
     const path = window.location.pathname
     const pub = PUBLIC_PATHS.some(p => path.startsWith(p))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsPublicPath(pub)
   }, [])
 
@@ -333,6 +337,8 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       const userId = session.user.id
       const disclaimerKey = `purepaw_disclaimer_ack_v1_${userId}`
       const disclaimerAck = localStorage.getItem(disclaimerKey)
+      // 登入狀態（外部 session）變更後依 localStorage 決定是否顯示免責聲明，屬與外部系統同步
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!disclaimerAck && !isPublicPath) setShowDisclaimer(true)
     }
   }, [status, session, isPublicPath])

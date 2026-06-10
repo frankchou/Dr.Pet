@@ -42,7 +42,9 @@ export default function SymptomsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // localStorage 僅存在於 client，惰性初始化會造成 SSR/hydration 不一致，故於 effect 水合
     const stored = localStorage.getItem('drpet_currentPetId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPetId(stored)
 
     const onStorage = (e: StorageEvent) => {
@@ -54,10 +56,13 @@ export default function SymptomsPage() {
 
   useEffect(() => {
     if (!petId) {
+      // 無選定寵物時清空列表並結束載入，屬與外部資料（petId）同步
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntries([])
       setLoading(false)
       return
     }
+    // 切換寵物時觸發非同步抓取，setLoading 為與外部 fetch 同步的載入旗標
     setLoading(true)
     fetch(`/api/symptoms?petId=${petId}&limit=200`)
       .then((r) => (r.ok ? r.json() : []))

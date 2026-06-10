@@ -123,16 +123,6 @@ function SvgPlus() {
   )
 }
 
-function SvgMenu() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width={18} height={18}>
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  )
-}
-
 // ─── Toast ───────────────────────────────────────────────────────────────────
 
 function Toast({ message }: { message: string }) {
@@ -256,6 +246,9 @@ function CoOwnerSection({ petId }: { petId: string }) {
             <div key={m.id} className="flex items-center gap-3 py-2">
               <div className="w-8 h-8 rounded-full bg-[#FFE8D6] flex items-center justify-center text-xs font-bold text-[#D98A53] overflow-hidden shrink-0">
                 {m.user.image ? (
+                  // 共同飼主頭像為第三方（Google）遠端 URL、尺寸不定且僅顯示於 32px 容器，
+                  // 改用 next/image 需設定 remotePatterns 且效益低，故維持 <img>。
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.user.image} alt="" className="w-full h-full object-cover" />
                 ) : (
                   (m.user.name?.charAt(0) ?? m.user.email?.charAt(0) ?? '?').toUpperCase()
@@ -359,6 +352,8 @@ function CoOwnerSection({ petId }: { petId: string }) {
             <h3 className="text-base font-bold text-[#111111] text-center mb-1">或讓對方當面掃描</h3>
             <p className="text-xs text-slate-400 text-center mb-4">請對方掃描下方 QR Code 加入共同飼主</p>
             <div className="flex justify-center mb-4">
+              {/* QR Code 為前端即時產生的 data URL，next/image 無從最佳化，維持 <img> */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrDataUrl} alt="QR Code" className="w-[200px] h-[200px]" />
             </div>
             <p className="text-xs text-slate-400 text-center break-all leading-relaxed mb-4">{qrInviteUrl}</p>

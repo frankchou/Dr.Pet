@@ -261,7 +261,6 @@ function WeekView({ selectedDate, onDateSelect, recordedDates }: WeekViewProps) 
 // ─── DiaryCalendar（月/週切換）────────────────────────────────────────────────
 
 export default function DiaryCalendar({
-  petId: _petId,
   selectedDate,
   onDateSelect,
   recordedDates = new Set(),

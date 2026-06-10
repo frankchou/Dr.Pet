@@ -99,6 +99,8 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (currentPetId) {
+      // 切換寵物時重新抓取清單並同步 localStorage；loadItems/loadPetUsedProducts 內含 setState
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadItems(currentPetId)
       loadPetUsedProducts(currentPetId)
       localStorage.setItem('drpet_currentPetId', currentPetId)

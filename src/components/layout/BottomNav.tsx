@@ -54,6 +54,8 @@ export default function BottomNav() {
   const pathname = usePathname()
   const [pendingHref, setPendingHref] = useState<string | null>(null)
 
+  // 路由切換完成後清除「待跳轉」狀態，屬與外部系統（router pathname）同步
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPendingHref(null) }, [pathname])
 
   const isActive = (href: string): boolean => {

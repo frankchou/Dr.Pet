@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 非 app 程式：agent 暫存 worktree（已 gitignore）與原型/設計 kit，
+    // 不納入專案 lint（先前 2237 個 lint 錯近 99% 來自這兩處）。
+    ".claude/**",
+    "PurePaw/**",
   ]),
 ]);
 

@@ -72,6 +72,8 @@ export function useRecordParams() {
   const [params, setParams] = useState<RecordParam[]>(DEFAULT_RECORD_PARAMS)
 
   useEffect(() => {
+    // loadParams 讀取 localStorage（client only），惰性初始化會造成 SSR/hydration 不一致
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setParams(loadParams())
   }, [])
 

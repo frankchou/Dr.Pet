@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import { parseJson, symptomTypeLabel } from '@/lib/utils'
-import IngredientAnalysis from '@/components/home/IngredientAnalysis'
 import EmergencyCareModal from '@/components/home/EmergencyCareModal'
 
 // ─── 功能旗標 ────────────────────────────────────────────────────────────────
@@ -133,14 +132,6 @@ function SvgHeartPulse() {
   )
 }
 
-function SvgHeart({ size = 18 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  )
-}
-
 function SvgZap({ size = 18 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" width={size} height={size}>
@@ -214,18 +205,6 @@ function HealthTag({ children, accent = false }: { children: React.ReactNode; ac
     <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full text-[11px] font-bold text-slate-600">
       {children}
     </span>
-  )
-}
-
-function HealthMetric({ icon, bg, label, value }: { icon: React.ReactNode; bg: string; label: string; value?: string | null }) {
-  return (
-    <div className="bg-white border-2 border-slate-900/5 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[#111111]" style={{ backgroundColor: bg }}>
-        {icon}
-      </div>
-      <p className={`text-sm font-bold ${value ? 'text-slate-900' : 'text-slate-400'}`}>{value ?? '未記錄'}</p>
-      <p className="text-[10px] font-bold text-slate-400 leading-tight">{label}</p>
-    </div>
   )
 }
 

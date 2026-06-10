@@ -55,6 +55,8 @@ export default function DietStatusCard({ petId, date, value, onChange }: Props) 
   useEffect(() => {
     if (value.tab !== 'reduced') return
     if (plan) return  // 已載入，不重複請求
+    // 切到該 tab 時觸發非同步抓取，setLoadingPlan 為與外部 fetch 同步的載入旗標
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingPlan(true)
     fetch(`/api/meal-plans?petId=${petId}&date=${date}`)
       .then((r) => (r.ok ? r.json() : null))

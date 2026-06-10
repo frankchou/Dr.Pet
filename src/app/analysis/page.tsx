@@ -431,7 +431,10 @@ export default function AnalysisPage() {
       })
     : []
 
-  const nutritionByProduct: ProductNutrition[] = (data as AnalysisResponse | null)?.nutritionByProduct ?? []
+  const nutritionByProduct: ProductNutrition[] = useMemo(
+    () => (data as AnalysisResponse | null)?.nutritionByProduct ?? [],
+    [data]
+  )
 
   // 彙整有風險的產品（useMemo 確保穩定，供 runRecommend 使用）
   const riskyProductsForRec = useMemo(() => {

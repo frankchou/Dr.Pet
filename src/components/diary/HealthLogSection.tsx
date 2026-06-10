@@ -100,6 +100,8 @@ export default function HealthLogSection({ petId, date, petSex, params = [], dai
   // 載入當日健康紀錄
   useEffect(() => {
     if (!petId) return
+    // 切換寵物 / 日期時先重置為預設值，再以非同步 fetch 結果覆寫，屬與外部資料同步
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLog(defaultLog())
     fetch(`/api/daily-health-log?petId=${petId}&date=${date}`)
       .then(r => r.ok ? r.json() : null)

@@ -48,6 +48,8 @@ export function useDailyTasks() {
   const [tasks, setTasks] = useState<DailyTask[]>(DEFAULT_DAILY_TASKS)
 
   useEffect(() => {
+    // loadTasks 讀取 localStorage（client only），惰性初始化會造成 SSR/hydration 不一致
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTasks(loadTasks())
     // 跨分頁 / 共同飼主同步：其他分頁更新 localStorage 時同步
     const onStorage = (e: StorageEvent) => {

@@ -157,7 +157,6 @@ type Stage = 'capture' | 'analyzing' | 'result'
 export default function ScanPage() {
   const [currentPetId, setCurrentPetId] = useState('')
   const [petName, setPetName] = useState('')
-  const [pets, setPets] = useState<Pet[]>([])
   const [history, setHistory] = useState<AnalysisRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -184,7 +183,6 @@ export default function ScanPage() {
     fetch('/api/pets')
       .then(r => r.json())
       .then((data: Pet[]) => {
-        setPets(data)
         const stored = typeof window !== 'undefined' ? localStorage.getItem('drpet_currentPetId') : null
         const id = stored && data.find(p => p.id === stored) ? stored : data[0]?.id ?? ''
         setCurrentPetId(id)
