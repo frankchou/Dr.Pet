@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@/lib/anthropic'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { isDemoUser } from '@/lib/demo'
+
+// demo 帳號的固定示意萃取結果（不打 AI vision）。依 docType 回對應結構：
+// product → 成分 / 營養分析；medical → 病歷重點。結構與 AI 路徑回傳的 extracted 一致。
+const DEMO_PRODUCT_EXTRACT = {
+  ingredients: [
+    '去骨鮭魚', '鮭魚粉', '馬鈴薯', '豌豆', '雞脂（混合生育醇保存）',
+    '鮭魚油', '亞麻仁籽', '乾燥甜菜漿', '氯化鉀', '牛磺酸', '綜合維生素與礦物質',
+  ],
+  protein_sources: ['鮭魚', '鮭魚粉'],
+  additives: ['混合生育醇（天然保存劑）'],
+  functional_ingredients: ['鮭魚油（Omega-3）', '牛磺酸', '綜合維生素', '綜合礦物質'],
+  nutritional_facts: [
+    { name: '粗蛋白', value: 26.0, unit: '%' },
+    { name: '粗脂肪', value: 15.0, unit: '%' },
+    { name: '粗纖維', value: 3.5, unit: '%' },
+    { name: '水分', value: 10.0, unit: '%' },
+    { name: '粗灰分', value: 7.0, unit: '%' },
+    { name: '鈣', value: 1.2, unit: '%' },
+    { name: '磷', value: 1.0, unit: '%' },
+  ],
+  raw_text:
+    '成分：去骨鮭魚、鮭魚粉、馬鈴薯、豌豆、雞脂（以混合生育醇保存）、鮭魚油、亞麻仁籽、乾燥甜菜漿、氯化鉀、牛磺酸、綜合維生素與礦物質。\n保證分析值：粗蛋白 26%、粗脂肪 15%、粗纖維 3.5%、水分 10%、粗灰分 7%、鈣 1.2%、磷 1.0%。',
+}
+
+const DEMO_MEDICAL_EXTRACT = {
+  date: '2026-05-18',
+  reason: '皮膚反覆搔癢、紅疹',
+  diagnosis: ['過敏性皮膚炎', '輕度耳道發炎'],
+  medications: ['抗組織胺（口服）', '外用消炎藥膏', '耳道清潔液'],
+  recommendations: ['更換為單一動物性蛋白配方並觀察', '兩週後回診追蹤皮膚狀況', '維持環境清潔與除濕'],
+  raw_text:
+    '就診日期：2026/05/18。主訴：皮膚反覆搔癢、紅疹。診斷：過敏性皮膚炎、輕度耳道發炎。處置：抗組織胺、外用消炎藥膏、耳道清潔液。建議：飲食調整、兩週後回診。',
+}
 
 const ALLOWED_TYPES: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = {
   'image/jpeg': 'image/jpeg',
@@ -19,6 +54,14 @@ export async function POST(request: NextRequest) {
 
     if (!file || !docType) {
       return NextResponse.json({ error: 'file 和 docType 為必填' }, { status: 400 })
+    }
+
+    // demo 帳號：回固定示意萃取結果，不打 AI vision。此 endpoint 原本無 auth，
+    // 故僅為判 demo 取 session；非 demo（含無 session）維持原行為。
+    const session = await auth()
+    if (isDemoUser(session)) {
+      const extracted = docType === 'product' ? DEMO_PRODUCT_EXTRACT : DEMO_MEDICAL_EXTRACT
+      return NextResponse.json({ extracted })
     }
 
     // 檢查大小（限制 20MB）

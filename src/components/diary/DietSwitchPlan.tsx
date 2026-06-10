@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // 換食計畫元件 — 可獨立使用於日誌頁或飲食頁
-
-// ─── mock 資料（正式環境改接真實 API） ─────────────────────────────────────────
-// 換食週期固定 14 天；當前測試商品、排程比例、身體特徵監控皆為展示用 mock。
+// 三區塊（排程比例／身體特徵監控／晉升淘汰建議）資料由 /api/switch-plan-ai 提供；
+// AI 載入中或資料不足時，以下方 mock 作為 fallback 維持畫面長相不破。
 
 const SWITCH_PLAN_TOTAL_DAYS = 14
 
@@ -27,6 +26,28 @@ interface BodyMetric {
   scratchWorsening: boolean
 }
 
+interface ScheduleRatio {
+  newPct: number
+  oldPct: number
+  label: string
+}
+
+interface Verdict {
+  status: 'suitable' | 'monitor' | 'discard'
+  message: string
+}
+
+// /api/switch-plan-ai 回傳結構（與後端 SwitchPlanResult 對齊）
+interface SwitchPlanAiResult {
+  dayCount: number
+  totalDays: number
+  schedule: ScheduleRatio
+  bodyMetric: BodyMetric
+  verdict: Verdict
+  degraded: boolean
+}
+
+// 當前測試商品仍為展示用 mock（換食商品來源尚未串接，屬待辦 4-4 範圍）。
 const MOCK_TEST_PRODUCT: TestProduct = {
   name: '低敏無穀鮭魚配方 (鮮魚)',
   formula: '低敏無穀鮭魚配方',
@@ -34,6 +55,7 @@ const MOCK_TEST_PRODUCT: TestProduct = {
   tags: ['高品質蛋白', '腸胃適應期'],
 }
 
+// AI 載入中／失敗時的身體特徵監控 fallback，維持畫面長相不破。
 const MOCK_BODY_METRIC: BodyMetric = {
   stoolScore: 3.5,
   stoolStatus: '形狀理想',
@@ -82,17 +104,24 @@ const DiscardIcon = () => (
   </svg>
 )
 
+const EndPlanIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}>
+    <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+  </svg>
+)
+
 function Spinner() {
   return <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
 }
 
-// 換食 7 天排程建議：依目標天數推估「今日建議新配方比例」
-// 14 天計畫從 0% 線性遞增到 100%，回傳就近的整數比例（新:舊）
-function recommendedRatio(dayCount: number): { newPct: number; oldPct: number; label: string } {
+// 換食 7 天排程建議 fallback：依目標天數推估「今日建議新配方比例」
+// 14 天計畫從 0% 線性遞增到 100%，回傳就近的整數比例（新:舊）。
+// AI 載入中／失敗時使用，正式資料改吃 /api/switch-plan-ai。
+function recommendedRatio(dayCount: number): ScheduleRatio {
   const ratio = Math.min(1, dayCount / SWITCH_PLAN_TOTAL_DAYS)
   // 取就近的四分位呈現，符合設計圖「1:3」這類整齊比例
   const quarters = Math.round(ratio * 4)
-  const map: Record<number, { newPct: number; oldPct: number; label: string }> = {
+  const map: Record<number, ScheduleRatio> = {
     0: { newPct: 0, oldPct: 100, label: '0:4 (新:舊)' },
     1: { newPct: 25, oldPct: 75, label: '1:3 (新:舊)' },
     2: { newPct: 50, oldPct: 50, label: '1:1 (新:舊)' },
@@ -103,19 +132,57 @@ function recommendedRatio(dayCount: number): { newPct: number; oldPct: number; l
 }
 
 interface DietPlanActiveProps {
+  petId: string
   startDate: string
   onPromote: () => void
   onDiscard: () => void
+  onEnd: () => void
 }
 
-function DietPlanActive({ startDate, onPromote, onDiscard }: DietPlanActiveProps) {
+function DietPlanActive({ petId, startDate, onPromote, onDiscard, onEnd }: DietPlanActiveProps) {
   const dayCount = Math.min(
     SWITCH_PLAN_TOTAL_DAYS,
     Math.max(1, Math.floor((Date.now() - new Date(startDate).getTime()) / 86_400_000) + 1),
   )
   const product = MOCK_TEST_PRODUCT
-  const metric  = MOCK_BODY_METRIC
-  const ratio   = recommendedRatio(dayCount)
+
+  const [ai, setAi] = useState<SwitchPlanAiResult | null>(null)
+  const [aiLoading, setAiLoading] = useState(true)
+  const [aiError, setAiError] = useState(false)
+  const [confirmEnd, setConfirmEnd] = useState(false)
+
+  const loadAi = useCallback(async () => {
+    if (!petId) {
+      setAiLoading(false)
+      setAiError(true)
+      return
+    }
+    setAiLoading(true)
+    setAiError(false)
+    try {
+      const res = await fetch('/api/switch-plan-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ petId, dayCount }),
+      })
+      if (!res.ok) throw new Error('switch-plan-ai failed')
+      const data = await res.json() as SwitchPlanAiResult
+      setAi(data)
+    } catch {
+      setAiError(true)
+    } finally {
+      setAiLoading(false)
+    }
+  }, [petId, dayCount])
+
+  useEffect(() => {
+    void loadAi()
+  }, [loadAi])
+
+  // AI 成功則用真實資料；載入中／失敗則回退 mock，維持設計圖長相不破。
+  const ratio  = ai?.schedule ?? recommendedRatio(dayCount)
+  const metric = ai?.bodyMetric ?? MOCK_BODY_METRIC
+  const verdict = ai?.verdict ?? null
 
   return (
     <div className="space-y-6">
@@ -150,9 +217,22 @@ function DietPlanActive({ startDate, onPromote, onDiscard }: DietPlanActiveProps
 
       {/* ── 7 天換食排程建議 ── */}
       <section>
-        <h3 className="flex items-center gap-1.5 text-sm font-bold text-[#8B7355] mb-3">
-          <CalendarIcon /> 7 天換食排程建議
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-[#8B7355]">
+            <CalendarIcon /> 7 天換食排程建議
+          </h3>
+          {aiLoading && (
+            <span className="flex items-center gap-1.5 text-[11px] font-medium text-[#8B7355]">
+              <span className="w-3.5 h-3.5 border-2 border-[#8B7355] border-t-transparent rounded-full animate-spin" />
+              AI 分析中
+            </span>
+          )}
+          {!aiLoading && (aiError || ai?.degraded) && (
+            <button onClick={() => void loadAi()} className="text-[11px] font-bold text-[#C4714A] underline-offset-2 hover:underline">
+              {aiError ? '分析失敗，點此重試' : '資料不足，點此重試'}
+            </button>
+          )}
+        </div>
         <div className="bg-white rounded-3xl border border-[#F0E3D6] shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="font-bold text-[#2C1810]">今日建議比例</span>
@@ -200,6 +280,24 @@ function DietPlanActive({ startDate, onPromote, onDiscard }: DietPlanActiveProps
             </p>
           </div>
         </div>
+
+        {/* AI 晉升/淘汰建議：依監控結果給適應判斷與提示 */}
+        {verdict && (
+          <div
+            className={`mt-3 rounded-2xl border p-3.5 text-xs font-medium leading-relaxed ${
+              verdict.status === 'suitable'
+                ? 'bg-[#F1F5EE] border-[#D8E2CF] text-[#5A6B4A]'
+                : verdict.status === 'discard'
+                ? 'bg-[#FEF2F2] border-[#F0D6D6] text-[#B91C1C]'
+                : 'bg-[#FBF7F0] border-[#F0E3D6] text-[#8B7355]'
+            }`}
+          >
+            <span className="font-bold">
+              {verdict.status === 'suitable' ? '✦ AI 建議：適應良好' : verdict.status === 'discard' ? '⚠ AI 建議：建議淘汰' : 'AI 建議：持續觀察'}
+            </span>
+            <p className="mt-1">{verdict.message}</p>
+          </div>
+        )}
       </section>
 
       {/* ── 底部行動鈕 ── */}
@@ -219,6 +317,38 @@ function DietPlanActive({ startDate, onPromote, onDiscard }: DietPlanActiveProps
           淘汰並更換
         </button>
       </div>
+
+      {/* ── 結束計畫：隨時臨時中止（有別於晉升/淘汰），需確認 + 可取消 ── */}
+      {!confirmEnd ? (
+        <button
+          onClick={() => setConfirmEnd(true)}
+          className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#8B7355] hover:text-[#2C1810] transition-colors py-2"
+        >
+          <EndPlanIcon />
+          結束計畫
+        </button>
+      ) : (
+        <div className="rounded-2xl border border-[#F0E3D6] bg-white p-4 shadow-sm">
+          <p className="text-sm font-bold text-[#2C1810]">確定要結束這個換食計畫嗎？</p>
+          <p className="text-xs font-medium text-[#8B7355] mt-1 leading-relaxed">
+            結束後將清除目前進行中的計畫，回到尚未啟動換食的畫面。此操作不會記錄為晉升或淘汰。
+          </p>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <button
+              onClick={() => setConfirmEnd(false)}
+              className="rounded-2xl bg-[#F5F3F0] text-[#8B7355] py-3 font-bold hover:bg-[#EDE9E3] transition-colors"
+            >
+              取消
+            </button>
+            <button
+              onClick={onEnd}
+              className="rounded-2xl bg-[#DC2626] text-white py-3 font-bold hover:bg-[#B91C1C] transition-colors"
+            >
+              確定結束
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -228,7 +358,6 @@ interface Props {
 }
 
 export default function DietSwitchPlan({ petId }: Props) {
-  void petId // 正式環境用於拉取真實換食計畫資料；目前為 mock 展示
   const [hasPlan, setHasPlan] = useState(false)
   const [planStart, setPlanStart] = useState('')
   const [hydrated, setHydrated] = useState(false)
@@ -294,9 +423,11 @@ export default function DietSwitchPlan({ petId }: Props) {
 
   return (
     <DietPlanActive
+      petId={petId}
       startDate={planStart}
       onPromote={endPlan}
       onDiscard={endPlan}
+      onEnd={endPlan}
     />
   )
 }

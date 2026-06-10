@@ -3,6 +3,7 @@ import { anthropic } from '@/lib/anthropic'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
 
 // ─── 型別 ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,61 @@ export interface DietAnalysisResult {
   detailedReport: DetailedReport
 }
 
+// ─── demo mock ────────────────────────────────────────────────────────────────
+// demo 帳號回固定示意配餐分析（不打 AI）。內容取自設計圖 diet-ai-analysis-* /
+// 前端 diet/page.tsx 的降級 mock，結構與 AI 路徑回傳完全一致。
+const DEMO_DIET_ANALYSIS: DietAnalysisResult = {
+  score: 92,
+  protein: 26,
+  fat: 14,
+  calciumPhosphorus: '1.1:1',
+  moisture: 78,
+  alerts: [
+    { type: 'warning', message: '磷含量過高 (1.4%)' },
+    { type: 'warning', message: '水分不足 (60%)' },
+  ],
+  expertComment: '學理分析示磷值達臨界，應增水代謝。同步官方通報無警示批次，請安心餵食。',
+  swapRecommendations: [
+    {
+      session: 'morning',
+      currentItem: '自然本色小型成犬 亮白無穀鮭魚',
+      reason: '磷偏高恐傷腎',
+      alternatives: [{ name: '健康低磷鮮燉罐', reason: '無膠特調控磷配比' }],
+    },
+    {
+      session: 'evening',
+      currentItem: '自然本色亮白無穀鮭魚',
+      reason: '鈉偏高腎臟負擔',
+      alternatives: [{ name: '黃金南瓜鮮蒸雞肉', reason: '鉀離子含量優防脫' }],
+    },
+  ],
+  localStoreRecs: [
+    { store: '全聯福利中心', productName: '大成安心手撕雞胸', suitabilityScore: 96, comment: '原型食物低磷高水' },
+    { store: '寵物公園 (門市)', productName: '健康低磷鮮燉罐', suitabilityScore: 94, comment: '無膠特調控磷配比' },
+    { store: '大樹寵物 (店面)', productName: '黃金南瓜鮮蒸雞肉', suitabilityScore: 91, comment: '鉀離子含量優防脫' },
+  ],
+  detailedReport: {
+    nutritionStandard:
+      '系統依據美國飼料品管協會 (AAFCO) 與美國國家科學研究委員會 (NRC) 的國際權威指引，將您配餐的數據統一轉換為「乾物質比 (Dry Matter Basis, DMB)」。藉此剔除水分干擾，客觀評估粗蛋白、脂肪、碳水化合物及微量元素，是否確實符合毛孩當前年齡階段之基礎需求。',
+    hydration:
+      '水分是預防泌尿道與腎臟疾病的關鍵。系統將依據毛孩體重精算每日基礎需水量，並比對當前配餐中的含水量（如乾糧與濕食的佔比），精準預估水分缺口，提醒您是否需要額外引導毛孩喝水。',
+    dietaryRestrictions:
+      '系統將嚴格為您的設定把關。自動比對配餐成分以攔截「已知過敏原」（如牛肉、雞肉、乳製品、大豆或特定穀物）；並針對不同疾病之特殊健康需求（如腎臟病需嚴控磷攝取、心臟病需低鈉、泌尿道結石需控鎂與鈣），進行數值超標預警，協助落實居家疾病飲食管理。',
+    ingredientScience:
+      '系統全數依據世界小動物獸醫醫學會 (WSAVA) 營養指南與臨床毒理學文獻進行中立標示。系統會提示配餐中的「非必要人工添加物或爭議性成分」（如特定化學防腐劑、人工色素），同時也標註具備科學實證的「機能性益生原料」（如 Omega-3 脂肪酸），提供您長期選購的客觀參考。',
+    foodSafetyAlert:
+      '系統定期對接 FDA (美國食品藥物管理局) 與 TFDA 等官方機構之公開資訊。若當前配餐中包含近期經官方通報為「預防性下架、重金屬超標或配方重大異動」之商品，系統將即時發出風險阻斷提示。',
+    drugFoodInteraction:
+      '若您在檔案中註記毛孩正處於特定藥物療程（如服用抗生素、利尿劑、甲狀腺藥物），系統將運算當前配餐中的特定營養素（如高濃度鈣離子）是否會產生化學螯合作用而降低藥效，輔助您適當錯開餵食時間（註：實際給藥指引請絕對遵從主治獸醫醫囑）。',
+    calorieCalculation:
+      '考量基礎代謝率會隨環境浮動，系統將結合在地氣象數據與您輸入的日活動量。如遇極端低溫需產熱，或長期活動量驟減時，系統將動態提出總熱量微調建議。',
+    foodTransition:
+      '系統自動追蹤新商品之「引入天數與餵食比例」。若偵測單次換食幅度過大，將依據獸醫常規換食指引發出潛在急性腸胃不適預警，並產出符合學理的「7 天漸進換食配比建議」，防範因突然換食造成的腸胃負擔。',
+    logCorrelation:
+      '結合獸醫臨床病理的時序特性，系統具備動態回溯功能。若您於日誌中記載腸胃異常（如軟便），系統將比對近 48 小時內的飲食變更；若為皮膚或淚腺狀態異常，則延伸溯源至近 14 天的成分疊加情形，提取潛在的飲食關聯數據供您與獸醫參考。',
+  },
+}
+
 // ─── 工具函式 ─────────────────────────────────────────────────────────────────
 
 function sessionLabel(session: string): string {
@@ -106,6 +162,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：回固定示意分析，不打 AI。
+    if (isDemoUser(session)) {
+      return NextResponse.json(DEMO_DIET_ANALYSIS)
+    }
 
     if (items.length === 0) {
       return NextResponse.json(

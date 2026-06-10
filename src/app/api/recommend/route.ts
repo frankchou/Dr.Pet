@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
 
 interface RiskyProduct {
   name: string
@@ -25,6 +26,42 @@ export interface ProductRecommendation {
   forProduct: string     // 哪個產品
   alternatives: AlternativeRec[]
 }
+
+// demo 帳號的固定示意替代品推薦（不打 AI）。結構與 AI 路徑存入 resultJson 的
+// recommendations 陣列完全一致（ProductRecommendation[]）。
+const DEMO_RECOMMENDATIONS: ProductRecommendation[] = [
+  {
+    forProduct: '黃金牧場 雞肉鮮蔬成犬糧',
+    alternatives: [
+      {
+        productName: '自然森林 無穀深海鮭魚全齡犬糧',
+        reason: '改以單一動物性蛋白鮭魚取代雞肉，可避開禽類過敏原並降低皮膚搔抓風險。',
+        keyFeatures: ['單一動物性蛋白', '無穀低敏配方', '添加 Omega-3 護膚'],
+        avoid: ['仍需確認無雞肉副產品', '避免額外含玉米的零食搭配'],
+        searchTip: '可於寵物公園、各大電商搜尋「自然森林 鮭魚 無穀」。',
+      },
+      {
+        productName: 'Orijen 六種魚無穀犬糧',
+        reason: '多種魚類蛋白來源、無穀配方，適合對禽類與穀物敏感的毛孩。',
+        keyFeatures: ['高比例新鮮魚肉', '無穀', '低升糖蔬果'],
+        avoid: ['價格較高需評估預算', '初次換食仍需漸進'],
+        searchTip: '搜尋「Orijen 六種魚」，注意選購犬用而非貓用配方。',
+      },
+    ],
+  },
+  {
+    forProduct: '海岸鮮燉 鮪魚白身罐 80g',
+    alternatives: [
+      {
+        productName: '健康時光 低鈉鮭魚主食罐',
+        reason: '以低鈉配方取代，減輕心血管與腎臟負擔，同時維持高含水量補水優點。',
+        keyFeatures: ['低鈉', '高含水量', '主食級營養完整'],
+        avoid: ['確認標示為主食罐而非副食罐', '避免另加高鈉湯汁'],
+        searchTip: '搜尋「低鈉 主食罐 鮭魚」，並比對成分中的鈉含量。',
+      },
+    ],
+  },
+]
 
 // GET: load latest saved recommendation for a pet
 export async function GET(request: NextRequest) {
@@ -64,6 +101,24 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：存固定示意推薦，不打 AI。仍寫入結果讓 GET / 歷史正常（保留最新 1 筆）。
+    if (isDemoUser(session)) {
+      const old = await prisma.productRecommendationResult.findMany({
+        where: { petId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      })
+      if (old.length > 0) {
+        await prisma.productRecommendationResult.deleteMany({
+          where: { id: { in: old.map((r) => r.id) } },
+        })
+      }
+      const saved = await prisma.productRecommendationResult.create({
+        data: { petId, resultJson: JSON.stringify(DEMO_RECOMMENDATIONS) },
+      })
+      return NextResponse.json({ recommendations: DEMO_RECOMMENDATIONS, savedAt: saved.createdAt })
+    }
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) return NextResponse.json({ error: 'Pet not found' }, { status: 404 })

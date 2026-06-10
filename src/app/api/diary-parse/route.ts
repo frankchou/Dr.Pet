@@ -4,11 +4,35 @@ import { prisma } from '@/lib/prisma'
 import { parseJson } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
 
 interface ParsedRecord {
   type: 'symptom' | 'medication' | 'grooming' | 'health_metric' | 'food_note'
   label: string       // 顯示給使用者看的描述
   data: Record<string, unknown>
+}
+
+// demo 帳號的固定示意隨記解析結果（不打 AI）。涵蓋症狀 / 健康指標 / 飲食三類，
+// 結構與 AI 路徑回傳完全一致；確認後可正常經 PUT 寫入。
+const DEMO_DIARY_PARSE: { records: ParsedRecord[]; summary: string } = {
+  records: [
+    {
+      type: 'symptom',
+      label: '皮膚搔癢（中等）',
+      data: { symptomType: 'skin', severity: 3, notes: '後腿與肚子處反覆搔抓' },
+    },
+    {
+      type: 'health_metric',
+      label: '活力正常、飲水量偏低',
+      data: { vitality: 'medium', waterIntake: 'low', notes: '今日喝水較少' },
+    },
+    {
+      type: 'food_note',
+      label: '飲食備註：鮭魚主食罐 + 少量南瓜',
+      data: { notes: '晚餐餵食鮭魚主食罐並加入少量蒸南瓜' },
+    },
+  ],
+  summary: '為你整理到 1 筆皮膚症狀、1 筆健康指標與 1 筆飲食備註。',
 }
 
 export async function POST(request: NextRequest) {
@@ -22,6 +46,11 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：回固定示意解析結果，不打 AI。
+    if (isDemoUser(session)) {
+      return NextResponse.json(DEMO_DIARY_PARSE)
+    }
 
     const pet = await prisma.pet.findUnique({
       where: { id: petId },

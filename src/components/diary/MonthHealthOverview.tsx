@@ -167,6 +167,11 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
   const [dayLog, setDayLog]       = useState<HealthLogData | null>(null)
   const [loading, setLoading]     = useState(false)
 
+  // AI 解讀狀態
+  const [aiSummary, setAiSummary]   = useState<string | null>(null)
+  const [aiLoading, setAiLoading]   = useState(false)
+  const [aiError, setAiError]       = useState(false)
+
   const yearMonth = date.slice(0, 7)          // YYYY-MM
   const monthNum  = parseInt(date.split('-')[1], 10)
 
@@ -200,6 +205,47 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
       .then((data: HealthLogData | null) => setDayLog(data))
       .catch(() => { if (!silent) setDayLog(null) })
   }, [petId, date, refreshKey])
+
+  // AI 解讀：只在「當月統計實質變動」時重打，輪詢（refreshKey）本身不重打。
+  // 以一個輕量統計簽章代表本月健康資料；簽章不變就沿用既有解讀。
+  const aiStatsSig = monthLogs
+    .map(l =>
+      [
+        l.date, l.vitality ?? '', l.appetite ?? '', l.waterStatus ?? '',
+        l.stoolType ?? '', l.urineStatus ?? '', l.mood, l.skinHair, l.eyeEar,
+        l.dental, l.digestion, l.respiratory, l.neuro, l.reproductive,
+      ].join('~')
+    )
+    .join('|')
+
+  const lastAiSigRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!petId) return
+    // 無健康日誌不顯示 AI 解讀
+    if (monthLogs.length === 0) {
+      setAiSummary(null)
+      setAiError(false)
+      lastAiSigRef.current = null
+      return
+    }
+    const sig = `${petId}|${yearMonth}|${aiStatsSig}`
+    if (sig === lastAiSigRef.current) return   // 統計沒變（含輪詢）→ 不重打
+    lastAiSigRef.current = sig
+
+    let cancelled = false
+    setAiLoading(true)
+    setAiError(false)
+    fetch(`/api/month-summary?petId=${petId}&yearMonth=${yearMonth}`)
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { summary: string | null }) => {
+        if (!cancelled) setAiSummary(data.summary)
+      })
+      .catch(() => {
+        if (!cancelled) { setAiError(true); lastAiSigRef.current = null }
+      })
+      .finally(() => { if (!cancelled) setAiLoading(false) })
+    return () => { cancelled = true }
+  }, [petId, yearMonth, aiStatsSig, monthLogs.length])
 
   // ── 月份統計 ────────────────────────────────────────────────────────────────
   // 健康相關統計「一律以 DailyHealthLog 為基準」，避免把「只有飲食紀錄的日子」誤算成健康良好。
@@ -414,6 +460,30 @@ export default function MonthHealthOverview({ petId, date, recordedCount: unionR
                 )}
               </div>
             </div>
+
+            {/* ── AI 解讀（依當月統計生成的白話健康摘要） ──────────────── */}
+            {(aiLoading || aiError || aiSummary) && (
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs font-bold text-[#C4714A] mb-2 flex items-center gap-1">
+                  <span>AI 健康解讀</span>
+                </p>
+                {aiLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="w-4 h-4 border-2 border-[#C4714A] border-t-transparent rounded-full animate-spin" />
+                    AI 解讀產生中…
+                  </div>
+                ) : aiError ? (
+                  <p className="text-xs text-slate-400">AI 解讀暫時無法產生，稍後再試。</p>
+                ) : (
+                  <div className="bg-[#FAF7F2] rounded-xl px-3 py-3 space-y-1.5">
+                    <p className="text-sm text-[#2C1810] leading-relaxed">{aiSummary}</p>
+                    <p className="text-[10px] text-[#8B7355]">
+                      由 AI 依本月健康日誌統計生成，僅供參考，非醫療診斷；如有疑慮請諮詢專業獸醫師。
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

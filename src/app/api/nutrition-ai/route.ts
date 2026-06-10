@@ -4,11 +4,58 @@ import { prisma } from '@/lib/prisma'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
 
 interface NutrientInput {
   name: string
   totalValue: number
   unit: string
+}
+
+// demo 帳號的固定示意營養評估（不打 AI）。涵蓋 safe / caution / warning 三種狀態，
+// 結構與 AI 路徑回傳的 analysis（含每項 summary）完全一致。
+const DEMO_NUTRITION_ANALYSIS = {
+  overall:
+    '整體飲食大致均衡，蛋白質與脂肪落在合理範圍；磷略為偏高，長期需留意腎臟負擔，建議搭配充足水分與適度調整配比。',
+  items: [
+    {
+      nutrient: '粗蛋白',
+      status: 'safe',
+      assessment: '蛋白質含量落在 AAFCO 維持需求的合理區間，足以支持日常活動。',
+      riskDetails: '',
+      recommendation: '維持目前蛋白來源，優先選擇好消化的動物性蛋白。',
+      summary: '數值正常，無需調整。',
+    },
+    {
+      nutrient: '粗脂肪',
+      status: 'safe',
+      assessment: '脂肪比例適中，可提供足夠能量且不致過量。',
+      riskDetails: '',
+      recommendation: '維持現況，避免額外添加高油脂零食。',
+      summary: '比例適中，維持即可。',
+    },
+    {
+      nutrient: '磷',
+      status: 'caution',
+      assessment: '磷含量略高於理想值，雖未超標但長期累積需留意。',
+      riskDetails: '長期磷攝取偏高可能增加腎臟代謝負擔，對年長或腎功能較弱的毛孩影響較明顯。',
+      recommendation: '可搭配低磷主食或增加濕食比例，並確保飲水充足。',
+      summary: '偏高需留意，建議增水並調整配比。',
+    },
+    {
+      nutrient: '鈉',
+      status: 'warning',
+      assessment: '鈉含量明顯偏高，超出日常維持的安全範圍。',
+      riskDetails: '長期高鈉飲食可能增加心血管與腎臟負擔，導致水腫或血壓上升風險。',
+      recommendation: '減少高鈉零食與加工食品，改以原型食物為主。',
+      summary: '明顯偏高，建議降低鈉攝取。',
+    },
+  ],
+  generalRecommendations: [
+    '增加每日飲水或濕食比例，協助磷與鈉代謝',
+    '減少高鈉加工零食，改以低鈉原型食物',
+    '若為年長或腎功能較弱的毛孩，建議與獸醫討論低磷處方飲食',
+  ],
 }
 
 // AAFCO 維持標準（乾物質基礎）
@@ -78,6 +125,29 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：存固定示意評估，不打 AI。仍寫入 NutritionAnalysis 讓 GET / 歷史正常。
+    if (isDemoUser(session)) {
+      const oldRecords = await prisma.nutritionAnalysis.findMany({
+        where: { petId },
+        orderBy: { createdAt: 'desc' },
+        skip: 2,
+        select: { id: true },
+      })
+      if (oldRecords.length > 0) {
+        await prisma.nutritionAnalysis.deleteMany({
+          where: { id: { in: oldRecords.map((r) => r.id) } },
+        })
+      }
+      const saved = await prisma.nutritionAnalysis.create({
+        data: { petId, resultJson: JSON.stringify(DEMO_NUTRITION_ANALYSIS), productCount },
+      })
+      return NextResponse.json({
+        ...DEMO_NUTRITION_ANALYSIS,
+        savedAt: saved.createdAt,
+        productCount: saved.productCount,
+      })
+    }
 
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) return NextResponse.json({ error: 'Pet not found' }, { status: 404 })

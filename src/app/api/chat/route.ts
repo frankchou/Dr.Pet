@@ -4,6 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { symptomTypeLabel, severityLabel, productTypeLabel, parseJson, VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
+
+// demo 帳號的固定示意 AI 諮詢回覆（不打 AI）。語氣與 system prompt 一致：
+// 問診引導 + 觀察建議 + 非診斷免責。
+const DEMO_CHAT_REPLY =
+  '謝謝你的描述！我先幫你整理一下目前的觀察方向：\n\n1. 飲食方面，建議先維持目前適應良好的配方，避免短期內頻繁更換，並記錄每次餵食的份量與毛孩的反應。\n2. 日常觀察上，可留意排便型態、皮膚搔抓頻率與精神食慾，每天簡單記錄，方便追蹤趨勢。\n3. 環境方面，注意季節變化與過敏原（塵蟎、清潔劑），維持環境清潔通風。\n\n方便再多告訴我症狀大約持續多久、有沒有合併其他變化嗎？這樣我能給更貼近的建議。\n\n提醒你：以上是資訊整理與觀察建議，不能替代獸醫診斷；若出現突發腫脹、出血、精神食慾明顯下降或持續嘔吐，請立即帶毛孩就醫。'
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,6 +50,20 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const access = await requirePetAccess(petId, session?.user?.id ?? '')
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+
+    // demo 帳號：回固定示意諮詢回覆，不打 AI。仍保存對話讓歷史正常。
+    if (isDemoUser(session)) {
+      const lastUserMsg = messages[messages.length - 1]
+      if (lastUserMsg && lastUserMsg.role === 'user') {
+        await prisma.chatMessage.create({
+          data: { petId, role: 'user', content: lastUserMsg.content },
+        })
+      }
+      await prisma.chatMessage.create({
+        data: { petId, role: 'assistant', content: DEMO_CHAT_REPLY },
+      })
+      return NextResponse.json({ message: DEMO_CHAT_REPLY })
+    }
 
     // Fetch pet data
     const pet = await prisma.pet.findUnique({

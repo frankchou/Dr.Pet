@@ -4,8 +4,27 @@ import { prisma } from '@/lib/prisma'
 import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
+import { isDemoUser } from '@/lib/demo'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+
+// demo 帳號回固定示意即時判定（不打 AI / Vision）。結構與 AI 路徑的 result 一致。
+const DEMO_INSTANT_RESULT = {
+  verdict: 'caution',
+  suitabilityScore: 68,
+  productName: '海洋之鑽 無穀鮭魚成貓配方',
+  brandName: '海洋之鑽',
+  summary: '整體成分尚可，但含少量可能誘發過敏的成分，建議少量試用並觀察反應。',
+  extractedIngredients: ['鮭魚', '雞肉', '豌豆', '魚油', '維生素E', '牛磺酸'],
+  concerns: [
+    { ingredient: '雞肉', reason: '雞肉為常見過敏原，若毛孩有皮膚或腸胃敏感史，建議謹慎少量試用。' },
+    { ingredient: '豌豆', reason: '豆類比例偏高時可能影響部分毛孩的消化，留意排便狀況。' },
+  ],
+  positives: [
+    { ingredient: '鮭魚', reason: '優質動物性蛋白，富含 Omega-3，有助皮膚與毛髮健康。' },
+    { ingredient: '牛磺酸', reason: '貓咪必需胺基酸，支持心臟與視力機能。' },
+  ],
+}
 
 const ALLOWED_TYPES: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = {
   'image/jpeg': 'image/jpeg',
@@ -13,6 +32,20 @@ const ALLOWED_TYPES: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | '
   'image/png':  'image/png',
   'image/gif':  'image/gif',
   'image/webp': 'image/webp',
+}
+
+// 將上傳圖片存到 /public/uploads/，回傳可公開存取的路徑；存檔失敗為非致命，回 null。
+async function saveUploadedImage(bytes: ArrayBuffer, rawType: string): Promise<string | null> {
+  try {
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+    await mkdir(uploadsDir, { recursive: true })
+    const ext = rawType.includes('png') ? 'png' : rawType.includes('gif') ? 'gif' : rawType.includes('webp') ? 'webp' : 'jpg'
+    const filename = `instant-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    await writeFile(path.join(uploadsDir, filename), Buffer.from(bytes))
+    return `/uploads/${filename}`
+  } catch {
+    return null
+  }
 }
 
 // GET: history list for a pet
@@ -58,6 +91,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '檔案過大，請上傳 20MB 以內的圖片' }, { status: 413 })
     }
 
+    const bytes = await file.arrayBuffer()
+    const rawType = file.type.toLowerCase()
+
+    // demo 帳號：回固定示意判定，不打 AI。仍存圖片 + DB 紀錄讓歷史列表正常顯示。
+    if (isDemoUser(session)) {
+      const imagePath = await saveUploadedImage(bytes, rawType)
+      const saved = await prisma.instantAnalysis.create({
+        data: {
+          petId,
+          verdict: DEMO_INSTANT_RESULT.verdict,
+          summary: DEMO_INSTANT_RESULT.summary,
+          resultJson: JSON.stringify(DEMO_INSTANT_RESULT),
+          imagePath,
+        },
+      })
+      return NextResponse.json({
+        ...DEMO_INSTANT_RESULT,
+        id: saved.id,
+        createdAt: saved.createdAt,
+        imagePath,
+      })
+    }
+
     // Load pet context
     const pet = await prisma.pet.findUnique({ where: { id: petId } })
     if (!pet) return NextResponse.json({ error: 'Pet not found' }, { status: 404 })
@@ -93,9 +149,7 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean).join('\n') || '尚未記錄使用產品'
 
     // Convert image to base64
-    const bytes = await file.arrayBuffer()
     const base64 = Buffer.from(bytes).toString('base64')
-    const rawType = file.type.toLowerCase()
     const mediaType = ALLOWED_TYPES[rawType] ?? 'image/jpeg'
 
     const prompt = `你是一位專業的寵物營養師，請分析照片中的寵物食品/零食/保健品的成分標籤，評估這款產品是否適合以下這隻寵物食用。
@@ -178,17 +232,7 @@ ${VET_REFERENCE_SCOPE}`
     }
 
     // Save image to /public/uploads/
-    let imagePath: string | null = null
-    try {
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-      await mkdir(uploadsDir, { recursive: true })
-      const ext = rawType.includes('png') ? 'png' : rawType.includes('gif') ? 'gif' : rawType.includes('webp') ? 'webp' : 'jpg'
-      const filename = `instant-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      await writeFile(path.join(uploadsDir, filename), Buffer.from(bytes))
-      imagePath = `/uploads/${filename}`
-    } catch {
-      // Image save failure is non-fatal
-    }
+    const imagePath = await saveUploadedImage(bytes, rawType)
 
     // Save to DB
     const saved = await prisma.instantAnalysis.create({

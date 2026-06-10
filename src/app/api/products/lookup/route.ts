@@ -5,6 +5,24 @@ import { anthropic } from '@/lib/anthropic'
 import { prisma } from '@/lib/prisma'
 import { analyzeIngredients } from '@/lib/ingredientAnalyzer'
 import { parseJson, productTypeLabel, symptomTypeLabel } from '@/lib/utils'
+import { auth } from '@/lib/auth'
+import { isDemoUser } from '@/lib/demo'
+
+// demo 帳號的固定示意產品成分（不打 AI）。仍會經本地知識庫 analyzeIngredients
+// （純本地、不打外部）算出 impact，使回傳結構與 AI 路徑完全一致。
+const DEMO_LOOKUP_AI = {
+  ingredients: [
+    '去骨鮭魚', '鮭魚粉', '馬鈴薯', '豌豆', '鮭魚油',
+    '亞麻仁籽', '乾燥甜菜漿', '氯化鉀', '牛磺酸', '綜合維生素與礦物質',
+  ],
+  protein_sources: ['鮭魚', '鮭魚粉'],
+  additives: ['混合生育醇（天然保存劑）'],
+  functional_ingredients: ['鮭魚油（Omega-3）', '牛磺酸', '綜合維生素', '綜合礦物質'],
+  raw_ingredient_text:
+    '去骨鮭魚、鮭魚粉、馬鈴薯、豌豆、鮭魚油、亞麻仁籽、乾燥甜菜漿、氯化鉀、牛磺酸、綜合維生素與礦物質。',
+  product_description: '以單一動物性蛋白鮭魚為主、無穀低敏的全齡犬糧，添加 Omega-3 護膚配方。',
+  is_estimate: false,
+}
 
 export interface LookupResult {
   // AI 找到的成分
@@ -45,6 +63,10 @@ export async function POST(request: NextRequest) {
     if (!name || !type) {
       return NextResponse.json({ error: '缺少產品名稱或類型' }, { status: 400 })
     }
+
+    // demo 帳號：成分查詢不打 AI（此 endpoint 原本無 auth，故僅為判 demo 取 session）。
+    const session = await auth()
+    const isDemo = isDemoUser(session)
 
     // 取得寵物症狀（若有 petId）
     let petSymptoms: string[] = []
@@ -101,15 +123,6 @@ export async function POST(request: NextRequest) {
 - 所有成分名稱請用繁體中文
 - 若為洗毛精/牙膏等外用品，ingredients 填清潔/功能性成分`
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const content = response.content[0]
-    if (content.type !== 'text') throw new Error('Unexpected response type')
-
     let aiData: {
       ingredients?: string[]
       protein_sources?: string[]
@@ -120,19 +133,33 @@ export async function POST(request: NextRequest) {
       is_estimate?: boolean
     }
 
-    try {
-      const cleaned = content.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      aiData = JSON.parse(cleaned)
-    } catch {
-      // AI 回應無法解析，用空值
-      aiData = {
-        ingredients: [],
-        protein_sources: [],
-        additives: [],
-        functional_ingredients: [],
-        raw_ingredient_text: content.text.slice(0, 500),
-        product_description: '無法解析 AI 回應',
-        is_estimate: true,
+    if (isDemo) {
+      // demo：用固定示意成分，不打 AI。仍走下方本地知識庫分析。
+      aiData = DEMO_LOOKUP_AI
+    } else {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      const content = response.content[0]
+      if (content.type !== 'text') throw new Error('Unexpected response type')
+
+      try {
+        const cleaned = content.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+        aiData = JSON.parse(cleaned)
+      } catch {
+        // AI 回應無法解析，用空值
+        aiData = {
+          ingredients: [],
+          protein_sources: [],
+          additives: [],
+          functional_ingredients: [],
+          raw_ingredient_text: content.text.slice(0, 500),
+          product_description: '無法解析 AI 回應',
+          is_estimate: true,
+        }
       }
     }
 

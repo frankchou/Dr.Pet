@@ -6,6 +6,7 @@ import { usePollingRefresh } from '@/hooks/usePollingRefresh'
 import type { DietAnalysisResult } from '@/app/api/diet-analysis/route'
 import DietSwitchPlan from '@/components/diary/DietSwitchPlan'
 import DailyReactionCard from '@/components/diary/DailyReactionCard'
+import AddItemModal from '@/components/diary/AddItemModal'
 
 // 產品評分（「吃後感想」）為 v1 功能，現版暫時隱藏、保留待未來啟用。
 // 其歸屬為飲食頁；要重新啟用把此旗標改為 true 即可。見 docs/未來功能.md。
@@ -73,10 +74,6 @@ type AnalysisTab = 'swap' | 'photo' | 'store' | 'ingredient'
 
 // ─── 常數 ────────────────────────────────────────────────────────────────────
 
-const UNIT_OPTIONS = ['平匙', '克', '朵', '錠', '份'] as const
-
-const TAG_OPTIONS = ['狗飼料', '貓飼料', '保健品', '鮮食', '零食'] as const
-
 const SESSION_META: Record<Session, { label: string; en: string; icon: React.ReactNode; bg: string }> = {
   morning: {
     label: '晨間',
@@ -128,19 +125,75 @@ const SESSION_META: Record<Session, { label: string; en: string; icon: React.Rea
 
 const SESSIONS: Session[] = ['morning', 'noon', 'evening']
 
+// 詳細報告九大項目：標題固定（對照 diet-ai-analysis-report-01~05），內容由 AI 生成
 const DETAIL_REPORT_ITEMS: Array<{ key: keyof DietAnalysisResult['detailedReport']; title: string }> = [
-  { key: 'nutritionStandard', title: '① 國際營養基準比對' },
-  { key: 'hydration', title: '② 水分攝取預估' },
-  { key: 'dietaryRestrictions', title: '③ 專屬飲食限制' },
-  { key: 'ingredientScience', title: '④ 成分學理標註' },
-  { key: 'foodSafetyAlert', title: '⑤ 官方食安通報' },
-  { key: 'drugFoodInteraction', title: '⑥ 潛在藥食關聯' },
-  { key: 'calorieCalculation', title: '⑦ 動態熱量試算' },
-  { key: 'foodTransition', title: '⑧ 換食過渡推估' },
-  { key: 'logCorrelation', title: '⑨ 日誌時序比對' },
+  { key: 'nutritionStandard', title: '國際營養基準比對' },
+  { key: 'hydration', title: '水分攝取預估參照' },
+  { key: 'dietaryRestrictions', title: '專屬飲食限制對照' },
+  { key: 'ingredientScience', title: '成分學理客觀標註' },
+  { key: 'foodSafetyAlert', title: '官方食安通報同步' },
+  { key: 'drugFoodInteraction', title: '潛在藥食關聯提示' },
+  { key: 'calorieCalculation', title: '動態熱量變數試算' },
+  { key: 'foodTransition', title: '換食過渡配比推估' },
+  { key: 'logCorrelation', title: '日誌時序關聯比對' },
 ]
 
 const HOT_SEARCH_CHIPS = ['鱈魚原肉配方', '深海起司罐身', '去皮鮮嫩乾糧']
+
+// 降級用 mock 配餐分析結果。
+// 正式環境一律由 /api/diet-analysis（AI）產生；此 mock 僅在 AI 失敗時降級顯示，
+// 讓畫面（含詳細報告九大項）能呈現以供驗證長相。內容取自設計圖 diet-ai-analysis-*。
+const MOCK_DIET_ANALYSIS: DietAnalysisResult = {
+  score: 92,
+  protein: 26,
+  fat: 14,
+  calciumPhosphorus: '1.1:1',
+  moisture: 78,
+  alerts: [
+    { type: 'warning', message: '磷含量過高 (1.4%)' },
+    { type: 'warning', message: '水分不足 (60%)' },
+  ],
+  expertComment: '學理分析示磷值達臨界，應增水代謝。同步官方通報無警示批次，請安心餵食。',
+  swapRecommendations: [
+    {
+      session: 'morning',
+      currentItem: '自然本色小型成犬 亮白無穀鮭魚',
+      reason: '磷偏高恐傷腎',
+      alternatives: [{ name: '健康低磷鮮燉罐', reason: '無膠特調控磷配比' }],
+    },
+    {
+      session: 'evening',
+      currentItem: '自然本色亮白無穀鮭魚',
+      reason: '鈉偏高腎臟負擔',
+      alternatives: [{ name: '黃金南瓜鮮蒸雞肉', reason: '鉀離子含量優防脫' }],
+    },
+  ],
+  localStoreRecs: [
+    { store: '全聯福利中心', productName: '大成安心手撕雞胸', suitabilityScore: 96, comment: '原型食物低磷高水' },
+    { store: '寵物公園 (門市)', productName: '健康低磷鮮燉罐', suitabilityScore: 94, comment: '無膠特調控磷配比' },
+    { store: '大樹寵物 (店面)', productName: '黃金南瓜鮮蒸雞肉', suitabilityScore: 91, comment: '鉀離子含量優防脫' },
+  ],
+  detailedReport: {
+    nutritionStandard:
+      '系統依據美國飼料品管協會 (AAFCO) 與美國國家科學研究委員會 (NRC) 的國際權威指引，將您配餐的數據統一轉換為「乾物質比 (Dry Matter Basis, DMB)」。藉此剔除水分干擾，客觀評估粗蛋白、脂肪、碳水化合物及微量元素，是否確實符合毛孩當前年齡階段之基礎需求。',
+    hydration:
+      '水分是預防泌尿道與腎臟疾病的關鍵。系統將依據毛孩體重精算每日基礎需水量，並比對當前配餐中的含水量（如乾糧與濕食的佔比），精準預估水分缺口，提醒您是否需要額外引導毛孩喝水。',
+    dietaryRestrictions:
+      '系統將嚴格為您的設定把關。自動比對配餐成分以攔截「已知過敏原」（如牛肉、雞肉、乳製品、大豆或特定穀物）；並針對不同疾病之特殊健康需求（如腎臟病需嚴控磷攝取、心臟病需低鈉、泌尿道結石需控鎂與鈣），進行數值超標預警，協助落實居家疾病飲食管理。',
+    ingredientScience:
+      '系統全數依據世界小動物獸醫醫學會 (WSAVA) 營養指南與臨床毒理學文獻進行中立標示。系統會提示配餐中的「非必要人工添加物或爭議性成分」（如特定化學防腐劑、人工色素），同時也標註具備科學實證的「機能性益生原料」（如 Omega-3 脂肪酸），提供您長期選購的客觀參考。',
+    foodSafetyAlert:
+      '系統定期對接 FDA (美國食品藥物管理局) 與 TFDA 等官方機構之公開資訊。若當前配餐中包含近期經官方通報為「預防性下架、重金屬超標或配方重大異動」之商品，系統將即時發出風險阻斷提示。',
+    drugFoodInteraction:
+      '若您在檔案中註記毛孩正處於特定藥物療程（如服用抗生素、利尿劑、甲狀腺藥物），系統將運算當前配餐中的特定營養素（如高濃度鈣離子）是否會產生化學螯合作用而降低藥效，輔助您適當錯開餵食時間（註：實際給藥指引請絕對遵從主治獸醫醫囑）。',
+    calorieCalculation:
+      '考量基礎代謝率會隨環境浮動，系統將結合在地氣象數據與您輸入的日活動量。如遇極端低溫需產熱，或長期活動量驟減時，系統將動態提出總熱量微調建議。',
+    foodTransition:
+      '系統自動追蹤新商品之「引入天數與餵食比例」。若偵測單次換食幅度過大，將依據獸醫常規換食指引發出潛在急性腸胃不適預警，並產出符合學理的「7 天漸進換食配比建議」，防範因突然換食造成的腸胃負擔。',
+    logCorrelation:
+      '結合獸醫臨床病理的時序特性，系統具備動態回溯功能。若您於日誌中記載腸胃異常（如軟便），系統將比對近 48 小時內的飲食變更；若為皮膚或淚腺狀態異常，則延伸溯源至近 14 天的成分疊加情形，提取潛在的飲食關聯數據供您與獸醫參考。',
+  },
+}
 
 // ─── SVG icons ───────────────────────────────────────────────────────────────
 
@@ -182,154 +235,6 @@ const InfoIcon = ({ size = 18, className = '' }: { size?: number; className?: st
   </svg>
 )
 
-// ─── 新增表單 ─────────────────────────────────────────────────────────────────
-
-interface AddItemFormProps {
-  planId: string
-  session: Session
-  onAdded: (item: MealPlanItem) => void
-  onCancel: () => void
-}
-
-function AddItemForm({ planId, session, onAdded, onCancel }: AddItemFormProps) {
-  const [customName, setCustomName] = useState('')
-  const [quantity, setQuantity] = useState<number>(1)
-  const [unit, setUnit] = useState<string>('份')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
-  }
-
-  const handleSubmit = async () => {
-    if (!customName.trim()) {
-      setError('請輸入商品名稱')
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/meal-plans/${planId}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session,
-          customName: customName.trim(),
-          quantity,
-          unit,
-          tags: selectedTags,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json() as { error?: string }
-        throw new Error(data.error ?? '新增失敗')
-      }
-      const item = await res.json() as MealPlanItem
-      onAdded(item)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '新增失敗，請重試')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="mt-3 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-      <div className="space-y-3">
-        {/* 商品名稱 */}
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">商品名稱</label>
-          <input
-            type="text"
-            value={customName}
-            onChange={e => setCustomName(e.target.value)}
-            placeholder="例：皇家低敏飼料"
-            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all placeholder:text-slate-400"
-          />
-        </div>
-
-        {/* 數量 + 單位 */}
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-slate-500 mb-1">數量</label>
-            <input
-              type="number"
-              min={0.1}
-              step={0.5}
-              value={quantity}
-              onChange={e => setQuantity(parseFloat(e.target.value) || 1)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-slate-500 mb-1">單位</label>
-            <select
-              value={unit}
-              onChange={e => setUnit(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all"
-            >
-              {UNIT_OPTIONS.map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* 標籤 */}
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-2">標籤（可多選）</label>
-          <div className="flex flex-wrap gap-2">
-            {TAG_OPTIONS.map(tag => {
-              const checked = selectedTags.includes(tag)
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-xs font-bold border transition-colors',
-                    checked
-                      ? 'bg-[#C4714A] text-white border-[#C4714A]'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-[#C4714A] hover:text-[#C4714A]',
-                  )}
-                >
-                  {tag}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {error && <p className="text-xs font-bold text-red-500">{error}</p>}
-
-        {/* 操作按鈕 */}
-        <div className="flex gap-2 pt-1">
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className={cn(
-              'flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2',
-              saving ? 'bg-slate-200 text-slate-400' : 'bg-[#111111] text-white hover:bg-black',
-            )}
-          >
-            {saving ? <Spinner className="text-slate-400" /> : '確認新增'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
-          >
-            取消
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── 時段 Accordion ───────────────────────────────────────────────────────────
 
 interface SessionAccordionProps {
@@ -338,6 +243,9 @@ interface SessionAccordionProps {
   isOpen: boolean
   onToggle: () => void
   planId: string | null
+  petId: string | null
+  // 此計畫已加入的產品名稱（modal 顯示「已加入」徽章用）
+  addedNames: Set<string>
   // 配餐計畫建立失敗時為錯誤訊息（用於前端硬化：不再無限轉圈）
   planError: string | null
   // 重試建立配餐計畫
@@ -352,12 +260,14 @@ function SessionAccordion({
   isOpen,
   onToggle,
   planId,
+  petId,
+  addedNames,
   planError,
   onRetryPlan,
   onItemAdded,
   onItemDeleted,
 }: SessionAccordionProps) {
-  const [showForm, setShowForm] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const meta = SESSION_META[session]
@@ -377,7 +287,7 @@ function SessionAccordion({
 
   const handleItemAdded = (item: MealPlanItem) => {
     onItemAdded(item)
-    setShowForm(false)
+    // 加入後不關閉 modal，允許連續加入多項（設計圖為持續搜尋選取）
   }
 
   return (
@@ -508,15 +418,9 @@ function SessionAccordion({
             </div>
           )}
 
-          {/* 新增表單 / 新增按鈕 / 建立計畫狀態（前端硬化：失敗顯示錯誤＋可重試） */}
-          {showForm && planId ? (
-            <AddItemForm
-              planId={planId}
-              session={session}
-              onAdded={handleItemAdded}
-              onCancel={() => setShowForm(false)}
-            />
-          ) : showForm && !planId && planError ? (
+          {/* 添加項目按鈕 → 開 bottom-sheet modal（AI 產品搜尋選取）。
+              前端硬化：建立計畫中 / 失敗時不開 modal，改顯示狀態＋可重試。 */}
+          {showModal && !planId && planError ? (
             <div className="rounded-xl border border-red-100 bg-red-50 p-3 space-y-2">
               <p className="text-sm font-bold text-red-500">{planError}</p>
               <div className="flex gap-2">
@@ -527,14 +431,14 @@ function SessionAccordion({
                   重試
                 </button>
                 <button
-                  onClick={() => setShowForm(false)}
+                  onClick={() => setShowModal(false)}
                   className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-colors"
                 >
                   取消
                 </button>
               </div>
             </div>
-          ) : showForm && !planId ? (
+          ) : showModal && !planId ? (
             <div className="w-full py-2.5 flex items-center justify-center gap-2 text-sm text-slate-400">
               <Spinner className="text-slate-300 w-4 h-4" />
               建立配餐計畫中…
@@ -542,7 +446,7 @@ function SessionAccordion({
           ) : (
             <button
               onClick={() => {
-                setShowForm(true)
+                setShowModal(true)
                 // 預設展開的時段（如早餐）不會經過 toggle，計畫可能還沒建立 →
                 // 點「繼續添加項目」時若尚無 planId 就主動觸發建立，避免無限轉圈。
                 if (!planId) onRetryPlan()
@@ -550,10 +454,22 @@ function SessionAccordion({
               className="w-full py-3 border border-dashed border-slate-300 rounded-2xl text-sm font-bold text-slate-500 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors flex items-center justify-center gap-1.5"
             >
               <Plus size={14} />
-              繼續添加項目
+              {items.length > 0 ? '繼續添加項目' : '添加項目'}
             </button>
           )}
         </div>
+      )}
+
+      {/* AI 產品搜尋 bottom-sheet modal（planId 就緒後才掛載） */}
+      {showModal && planId && (
+        <AddItemModal
+          planId={planId}
+          session={session}
+          petId={petId}
+          addedNames={addedNames}
+          onAdded={handleItemAdded}
+          onClose={() => setShowModal(false)}
+        />
       )}
     </div>
   )
@@ -567,22 +483,27 @@ interface NutrientBarProps {
   max: number
   color: string
   unit?: string
+  // 顯示用文字（如鈣磷比「1.1:1」），未提供時用 value+unit
+  displayValue?: string
 }
 
-function NutrientBar({ label, value, max, color, unit = '%' }: NutrientBarProps) {
+function NutrientBar({ label, value, max, color, unit = '%', displayValue }: NutrientBarProps) {
   const pct = Math.min(100, (value / max) * 100)
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs font-bold text-slate-600 w-16 shrink-0">{label}</span>
-      <div className="flex-1 bg-slate-100 rounded-full h-2">
+    <div>
+      {/* 標籤列：左標籤、右數值（對照 diet-ai-analysis-01/02 的 2×2 排版） */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-bold text-slate-700">{label}</span>
+        <span className="text-sm font-black" style={{ color }}>
+          {displayValue ?? `${value}${unit}`}
+        </span>
+      </div>
+      <div className="bg-slate-100 rounded-full h-2">
         <div
           className="h-2 rounded-full transition-all"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-xs font-bold text-slate-700 w-14 text-right shrink-0">
-        {value}{unit}
-      </span>
     </div>
   )
 }
@@ -598,47 +519,77 @@ function DetailedReportModal({ report, onClose }: DetailedReportModalProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl w-full max-w-[480px] max-h-[85vh] flex flex-col"
+        className="bg-white rounded-t-3xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Modal 標題 */}
+        {/* Modal 標題（對照 report-01：圖示 + 中文標題 + 英文副標 + 關閉鈕） */}
         <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="font-black text-lg text-[#2C1810]">全域綜合飲食分析報告</h2>
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#2C2C2E] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+                <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6 7 18.2l1.9-5.8L4 8.8h6.1L12 3z" />
+                <circle cx="18.5" cy="5.5" r="1.5" fill="#fff" stroke="none" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-black text-lg text-[#2C1810] leading-tight">全域綜合飲食分析報告</h2>
+              <p className="text-[10px] font-bold text-slate-400 tracking-wider mt-0.5 leading-tight">
+                GLOBAL DIETARY<br />COMPREHENSIVE REPORT
+              </p>
+            </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors shrink-0"
               aria-label="關閉"
             >
-              <XIcon size={14} />
+              <XIcon size={16} />
             </button>
           </div>
         </div>
 
         {/* 捲動內容 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
           {/* 系統分析基礎宣告 */}
-          <div className="bg-[#1C1C1E] text-white rounded-2xl p-4">
-            <p className="text-xs font-bold text-slate-400 mb-1">系統分析基礎宣告</p>
-            <p className="text-xs leading-relaxed text-slate-200">
-              本報告依據 AAFCO、FEDIAF、NRC 及 WSAVA 寵物營養準則，結合世界獸醫協會建議，對今日配餐進行多維度評估。所有數值為估算值，僅供參考，不取代獸醫師專業診斷。
+          <div className="bg-[#2C2C2E] text-white rounded-3xl p-5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <svg viewBox="0 0 24 24" fill="#E08A4F" stroke="none" width={18} height={18}>
+                <path d="M12 2l1.6 4.9L18.5 8.5l-4.9 1.6L12 15l-1.6-4.9L5.5 8.5l4.9-1.6L12 2z" />
+              </svg>
+              <p className="text-sm font-bold">系統分析基礎宣告</p>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-200">
+              本系統依據您設定的毛孩專屬健康檔案、目前飲食與日誌，透過以下 9 大客觀數據進行綜合交叉分析：
             </p>
           </div>
 
-          {/* 9 大分項 */}
-          {DETAIL_REPORT_ITEMS.map(({ key, title }) => (
-            <div key={key} className="bg-slate-50 rounded-2xl p-4">
-              <p className="text-xs font-black text-[#C4714A] mb-2">{title}</p>
-              <p className="text-sm leading-relaxed text-slate-700">{report[key]}</p>
-            </div>
-          ))}
+          {/* 九大運算準則分隔 */}
+          <div>
+            <p className="text-sm font-bold text-slate-400 tracking-[0.3em] mb-2">九大運算準則</p>
+            <div className="h-px bg-gradient-to-r from-slate-300 to-transparent" />
+          </div>
+
+          {/* 9 大分項（編號圓圈 + 標題 + 斜體灰內容，對照 report-01~05） */}
+          <div className="space-y-7">
+            {DETAIL_REPORT_ITEMS.map(({ key, title }, idx) => (
+              <div key={key} className="flex gap-4">
+                <span className="w-10 h-10 rounded-full bg-[#2C2C2E] text-white text-sm font-bold flex items-center justify-center shrink-0">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 text-base mb-2">{title}</p>
+                  <p className="text-sm leading-relaxed text-slate-400 italic">{report[key]}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* 底部按鈕 */}
-        <div className="px-5 py-4 border-t border-slate-100 shrink-0">
+        {/* 底部：版本標記 + 確認鈕（對照 report 各圖底部） */}
+        <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold text-slate-300 tracking-wider">AI SYNTHESIS REPORT V2.4</span>
           <button
             onClick={onClose}
-            className="w-full py-3 bg-[#111111] text-white font-bold rounded-2xl text-sm"
+            className="px-6 py-3 bg-[#2C2C2E] text-white font-bold rounded-full text-sm hover:bg-[#1c1c1e] transition-colors"
           >
             確認並關閉
           </button>
@@ -756,34 +707,90 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
     return '安全'
   }
 
-  const TABS: Array<{ key: AnalysisTab; label: string }> = [
-    { key: 'swap', label: '商品換掉' },
-    { key: 'photo', label: '自拍成分' },
-    { key: 'store', label: '實體通路' },
-    { key: 'ingredient', label: '輸入成分' },
+  const TABS: Array<{ key: AnalysisTab; label: string; icon: React.ReactNode }> = [
+    {
+      key: 'swap',
+      label: '商品換掉',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+          <polyline points="23 4 23 10 17 10" />
+          <polyline points="1 20 1 14 7 14" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+        </svg>
+      ),
+    },
+    {
+      key: 'photo',
+      label: '自拍成分',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      ),
+    },
+    {
+      key: 'store',
+      label: '實體通路',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+          <path d="M3 9l1-5h16l1 5M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M3 9h18" />
+        </svg>
+      ),
+    },
+    {
+      key: 'ingredient',
+      label: '輸入成分',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={20} height={20}>
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+      ),
+    },
   ]
 
   return (
     <>
       <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm mt-4">
-        {/* 標題列 + 評分 */}
+        {/* 標題列 + 評分（對照 diet-ai-analysis-01/02：左側腦圖示 + 標題/副標，右側大分數） */}
         <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase mb-0.5">AI 智能配餐重點分析</p>
-            <h3 className="font-black text-slate-900 text-base">今日配餐評估</h3>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[#2C2C2E] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+                <path d="M12 2a3 3 0 0 0-3 3v.5A2.5 2.5 0 0 0 6.5 8 2.5 2.5 0 0 0 5 12.5 2.5 2.5 0 0 0 6.5 17 3 3 0 0 0 12 19a3 3 0 0 0 5.5-2 2.5 2.5 0 0 0 1.5-4.5A2.5 2.5 0 0 0 17.5 8 2.5 2.5 0 0 0 15 5.5V5a3 3 0 0 0-3-3z" />
+                <path d="M12 2v17" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-black text-slate-900 text-base leading-tight">AI 智能配餐重點分析</h3>
+              <p className="text-xs font-bold text-slate-400 mt-0.5">核心指標匯總</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-4xl font-black text-[#C4714A] leading-none">{result.score}</p>
+          <div className="text-right shrink-0">
+            <p className="text-4xl font-black text-[#C4714A] leading-none">
+              {result.score}<span className="text-base font-bold">分</span>
+            </p>
             <p className="text-[10px] font-bold text-slate-400 mt-0.5">綜合適配度</p>
           </div>
         </div>
 
-        {/* 核心指標 */}
-        <div className="space-y-2.5 mb-4">
-          <NutrientBar label="蛋白" value={result.protein} max={60} color="#C4714A" />
-          <NutrientBar label="脂肪" value={result.fat} max={40} color="#F59E0B" />
-          <NutrientBar label={`鈣磷比 ${result.calciumPhosphorus}`} value={parseFloat(result.calciumPhosphorus)} max={2.5} color="#475569" unit="" />
-          <NutrientBar label="水分" value={result.moisture} max={100} color="#60A5FA" />
+        {/* 核心指標（2×2 排列，對照設計圖） */}
+        <div className="grid grid-cols-2 gap-x-5 gap-y-3 mb-3">
+          <NutrientBar label="蛋白" value={result.protein} max={60} color="#E08A4F" />
+          <NutrientBar label="脂肪" value={result.fat} max={40} color="#F0C14B" />
+          <NutrientBar label="鈣磷比" value={parseFloat(result.calciumPhosphorus)} max={2.5} color="#5C6B5A" unit="" displayValue={result.calciumPhosphorus} />
+          <NutrientBar label="水分" value={result.moisture} max={100} color="#4F86E0" />
+        </div>
+
+        {/* 容差圖例（對照設計圖 01/02 核心指標下方） */}
+        <div className="flex items-center gap-4 mb-4">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+            <span className="w-4 h-2.5 rounded-full bg-slate-200" />個體建議容差
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+            <span className="w-4 h-2.5 rounded-full bg-[#FCE4D2]" />腎臟病專屬容差
+          </span>
         </div>
 
         {/* 關鍵警示 */}
@@ -811,31 +818,49 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
           <p className="text-sm text-slate-700 leading-relaxed font-medium">"{result.expertComment}"</p>
         </div>
 
-        {/* 腎病飲食調配 4 Tab */}
-        <div className="mb-4">
-          <p className="text-xs font-black text-slate-500 tracking-wider mb-3">配餐優化建議</p>
+        {/* 配餐優化建議卡（對照 diet-ai-analysis-03~06：標題列 + AI 輔助徽章 + 四分類標籤 + 內容） */}
+        <div className="mb-4 bg-[#FBFAF8] border border-slate-100 rounded-2xl p-4">
+          {/* 標題列 */}
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-[#E08A4F] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={18} height={18}>
+                <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6 7 18.2l1.9-5.8L4 8.8h6.1L12 3z" />
+              </svg>
+            </div>
+            <h4 className="flex-1 font-black text-slate-900 text-base leading-tight">腎病飲食調配與商品推薦調換</h4>
+            <span className="shrink-0 px-2.5 py-1 rounded-full bg-[#5C6B5A] text-white text-[10px] font-bold">AI 輔助</span>
+          </div>
 
-          {/* Tab 切換 */}
-          <div className="flex gap-1.5 mb-4 flex-wrap">
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-bold transition-all',
-                  activeTab === tab.key
-                    ? 'bg-[#111111] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* 四分類資訊標籤（icon + 文字，對應 03~06） */}
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {TABS.map(tab => {
+              const active = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all',
+                    active
+                      ? 'bg-white border border-[#E08A4F] shadow-sm text-[#C4714A]'
+                      : 'bg-white/60 border border-transparent text-slate-400 hover:text-slate-600',
+                  )}
+                >
+                  <span className={cn(active ? 'text-[#C4714A]' : 'text-slate-400')}>{tab.icon}</span>
+                  <span className={cn('text-xs font-bold', active ? 'text-slate-800' : 'text-slate-500')}>
+                    {tab.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
           {/* Tab 1：商品換掉 */}
           {activeTab === 'swap' && (
             <div className="space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                🔍 診斷：早、中、晚三餐成分中，以下商品建議更換，幫助毛孩遠離健康風險。
+              </p>
               {result.swapRecommendations.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">目前配餐無需替換建議</p>
               ) : (
@@ -873,12 +898,13 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
             </div>
           )}
 
-          {/* Tab 2：自拍成分 */}
+          {/* Tab 2：自拍成分（對照 diet-ai-analysis-04：說明 + 置中相機虛線框） */}
           {activeTab === 'photo' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                拍攝鮮食/飼料成分，AI 將即時比對毛孩適合度並給分及十字內說明。
+              <p className="text-sm text-slate-600 leading-relaxed">
+                📸 自拍照成分比對：拍攝鮮食/飼料成分，AI 將即時比對毛孩適合度並給分及十字內說明。
               </p>
+              {/* capture="environment" → 手機點擊直接開後鏡頭；電腦版則回退為選檔上傳 */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -889,13 +915,18 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-sm font-bold text-slate-500 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors flex items-center justify-center gap-2"
+                className="w-full py-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#C4714A] hover:text-[#C4714A] transition-colors flex flex-col items-center justify-center gap-2"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={18} height={18}>
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                {photoFile ? photoFile.name : '上傳/拍攝成分標籤'}
+                <span className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={26} height={26}>
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </span>
+                <span className="text-sm font-bold text-slate-700">
+                  {photoFile ? photoFile.name : '拍攝/上傳背面包裝成分圖'}
+                </span>
+                <span className="text-xs text-slate-400">支持即時 OCR 辨識多寡項</span>
               </button>
 
               {photoFile && (
@@ -1029,10 +1060,10 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
           )}
         </div>
 
-        {/* 詳細分析報告按鈕 */}
+        {/* 詳細分析報告按鈕（對照 diet-ai-analysis-06：深色實心鈕） */}
         <button
           onClick={() => setShowModal(true)}
-          className="w-full py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-2xl text-sm hover:border-[#C4714A] hover:text-[#C4714A] transition-colors flex items-center justify-center gap-2"
+          className="w-full py-4 bg-[#2C2C2E] text-white font-bold rounded-2xl text-sm hover:bg-[#1c1c1e] transition-colors flex items-center justify-center gap-2"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={15} height={15}>
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1162,7 +1193,7 @@ export default function DietPage() {
     }
   }, [plan, petId, todayStr])
 
-  // 包裝 onItemAdded，確保 plan 存在後再讓 AddItemForm 使用 planId
+  // 包裝 onItemAdded，確保 plan 存在後再讓 AddItemModal 使用 planId
   const handleSessionNeedsPlan = useCallback(async (): Promise<string | null> => {
     const p = await ensurePlan()
     return p?.id ?? null
@@ -1231,7 +1262,11 @@ export default function DietPage() {
       const result = await res.json() as DietAnalysisResult
       setAiResult(result)
     } catch (e) {
-      setAiError(e instanceof Error ? e.message : 'AI 分析失敗，請重試')
+      // 降級：AI 失敗時仍以 mock 呈現畫面供驗證長相（正式環境主資料一律走 AI）。
+      // 同時保留錯誤提示，讓使用者知道目前看到的是示意內容。
+      setAiResult(MOCK_DIET_ANALYSIS)
+      const msg = e instanceof Error ? e.message : 'AI 分析失敗'
+      setAiError(`AI 分析暫時無法使用（${msg}），以下為示意內容。`)
     } finally {
       setAiAnalyzing(false)
     }
@@ -1240,6 +1275,11 @@ export default function DietPage() {
   // 按時段過濾品項
   const itemsForSession = (session: Session): MealPlanItem[] =>
     (plan?.items ?? []).filter(it => it.session === session)
+
+  // 已加入此計畫的產品名稱（modal 顯示「已加入」徽章用）
+  const addedNames = new Set<string>(
+    (plan?.items ?? []).map(it => it.product?.name ?? it.customName ?? '').filter(Boolean),
+  )
 
   return (
     <div className="px-6 md:px-8 min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 pb-36">
@@ -1299,6 +1339,8 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  petId={petId}
+                  addedNames={addedNames}
                 />
                 <SessionAccordionWithPlan
                   session="noon"
@@ -1310,6 +1352,8 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  petId={petId}
+                  addedNames={addedNames}
                 />
                 <SessionAccordionWithPlan
                   session="evening"
@@ -1321,6 +1365,8 @@ export default function DietPage() {
                   onEnsurePlan={handleSessionNeedsPlan}
                   onItemAdded={handleItemAdded}
                   onItemDeleted={handleItemDeleted}
+                  petId={petId}
+                  addedNames={addedNames}
                 />
 
                 {/* AI 分析結果（晚間 Accordion 下方） */}
@@ -1381,6 +1427,8 @@ interface SessionAccordionWithPlanProps {
   onToggle: () => void
   onOpen: () => void
   plan: MealPlan | null
+  petId: string | null
+  addedNames: Set<string>
   onEnsurePlan: () => Promise<string | null>
   onItemAdded: (item: MealPlanItem) => void
   onItemDeleted: (itemId: string) => void
@@ -1393,6 +1441,8 @@ function SessionAccordionWithPlan({
   onToggle,
   onOpen,
   plan,
+  petId,
+  addedNames,
   onEnsurePlan,
   onItemAdded,
   onItemDeleted,
@@ -1435,6 +1485,8 @@ function SessionAccordionWithPlan({
       isOpen={isOpen}
       onToggle={handleToggle}
       planId={resolvedPlanId}
+      petId={petId}
+      addedNames={addedNames}
       planError={planError}
       onRetryPlan={() => void tryEnsurePlan()}
       onItemAdded={onItemAdded}

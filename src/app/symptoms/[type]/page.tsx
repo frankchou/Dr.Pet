@@ -1,11 +1,16 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import PageHeader from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { symptomTypeLabel, severityEmoji, severityLabel, formatDate } from '@/lib/utils'
 import type { SymptomEntry } from '@/types'
+
+interface SymptomAdvice {
+  possibleCauses: string[]
+  recommendedActions: string[]
+}
 
 const LineChart = dynamic(
   () => import('recharts').then((mod) => mod.LineChart),
@@ -44,26 +49,69 @@ export default function SymptomTypePage() {
   const [loading, setLoading] = useState(true)
   const [petId, setPetId] = useState<string>('')
 
+  // AI 建議狀態
+  const [advice, setAdvice] = useState<SymptomAdvice | null>(null)
+  const [adviceLoading, setAdviceLoading] = useState(false)
+  const [adviceError, setAdviceError] = useState<string | null>(null)
+
+  // 對齊全站：以 localStorage 的 currentPetId 為準，而非「最舊寵物」
   useEffect(() => {
-    // Get first pet
-    fetch('/api/pets')
-      .then((r) => r.json())
-      .then((pets: Array<{ id: string }>) => {
-        if (pets.length > 0) {
-          setPetId(pets[0].id)
-          return fetch(
-            `/api/symptoms?petId=${pets[0].id}&symptomType=${type}&limit=30`
-          )
-        }
-        return null
-      })
-      .then((r) => (r ? r.json() : []))
+    const stored = localStorage.getItem('drpet_currentPetId')
+    setPetId(stored || '')
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'drpet_currentPetId') setPetId(e.newValue || '')
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  useEffect(() => {
+    if (!petId) {
+      setEntries([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    fetch(`/api/symptoms?petId=${petId}&symptomType=${type}&limit=30`)
+      .then((r) => (r.ok ? r.json() : []))
       .then((data: SymptomEntry[]) => {
-        setEntries(data.reverse()) // oldest first for chart
+        setEntries(Array.isArray(data) ? data.reverse() : []) // oldest first for chart
       })
-      .catch(console.error)
+      .catch(() => setEntries([]))
       .finally(() => setLoading(false))
-  }, [type])
+  }, [petId, type])
+
+  // 抓 AI 建議（後端有快取，無新資料不會重打 AI）
+  const fetchAdvice = useCallback(
+    async (refresh = false) => {
+      if (!petId) return
+      setAdviceLoading(true)
+      setAdviceError(null)
+      try {
+        const res = await fetch(
+          `/api/symptoms/advice?petId=${petId}&symptomType=${type}${refresh ? '&refresh=1' : ''}`
+        )
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data?.error || 'AI 建議生成失敗')
+        }
+        setAdvice(data.advice ?? null)
+      } catch (err) {
+        setAdviceError(err instanceof Error ? err.message : 'AI 建議生成失敗')
+      } finally {
+        setAdviceLoading(false)
+      }
+    },
+    [petId, type]
+  )
+
+  // 有紀錄才自動抓建議（無紀錄則後端回 null，省一次 round-trip）
+  useEffect(() => {
+    if (!loading && entries.length > 0) {
+      fetchAdvice()
+    }
+  }, [loading, entries.length, fetchAdvice])
 
   const handleDelete = async (id: string) => {
     if (!confirm('確定要刪除此記錄？')) return
@@ -175,6 +223,88 @@ export default function SymptomTypePage() {
               </Card>
             ))}
           </div>
+        )}
+
+        {/* AI 建議：可能原因 / 建議做法（有紀錄才顯示） */}
+        {entries.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>AI 觀察建議</CardTitle>
+                {!adviceLoading && (
+                  <button
+                    onClick={() => fetchAdvice(true)}
+                    className="text-xs text-[#4F7CFF] font-medium"
+                  >
+                    重新生成
+                  </button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {adviceLoading ? (
+                <p className="text-center text-gray-400 text-sm py-4">AI 分析中…</p>
+              ) : adviceError ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-red-400 mb-2">{adviceError}</p>
+                  <button
+                    onClick={() => fetchAdvice(true)}
+                    className="text-xs text-[#4F7CFF] font-medium"
+                  >
+                    重試
+                  </button>
+                </div>
+              ) : advice &&
+                (advice.possibleCauses.length > 0 ||
+                  advice.recommendedActions.length > 0) ? (
+                <div className="space-y-4">
+                  {advice.possibleCauses.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-[#1a1a2e] mb-2">
+                        可能原因
+                      </p>
+                      <ul className="space-y-1.5">
+                        {advice.possibleCauses.map((cause, i) => (
+                          <li
+                            key={i}
+                            className="text-sm text-gray-600 flex gap-2"
+                          >
+                            <span className="text-[#4F7CFF]">•</span>
+                            <span>{cause}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {advice.recommendedActions.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-[#1a1a2e] mb-2">
+                        建議做法
+                      </p>
+                      <ul className="space-y-1.5">
+                        {advice.recommendedActions.map((action, i) => (
+                          <li
+                            key={i}
+                            className="text-sm text-gray-600 flex gap-2"
+                          >
+                            <span className="text-[#4F7CFF]">•</span>
+                            <span>{action}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 leading-relaxed border-t border-gray-50 pt-3">
+                    以上為資訊整理與觀察建議，非醫療診斷，不能替代獸醫診斷。若症狀嚴重或持續惡化，請立即帶往獸醫院就醫。
+                  </p>
+                </div>
+              ) : (
+                <p className="text-center text-gray-400 text-sm py-4">
+                  暫無 AI 建議
+                </p>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Entry list */}
