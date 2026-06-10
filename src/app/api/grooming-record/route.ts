@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       customName,
       photoUrl,
       nextReminder,
+      reminderIntervalDays,
     } = body as {
       petId?: string
       date?: string
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
       customName?: string
       photoUrl?: string
       nextReminder?: string
+      reminderIntervalDays?: number
     }
 
     if (!petId || !date || !mode) {
@@ -110,6 +112,11 @@ export async function POST(request: NextRequest) {
         customName: customName ?? null,
         photoUrl: photoUrl ?? null,
         nextReminder: nextReminder ? new Date(nextReminder) : null,
+        // 週期天數僅在 > 0 時保存；0 或負值視為一次性（null）
+        reminderIntervalDays:
+          typeof reminderIntervalDays === 'number' && reminderIntervalDays > 0
+            ? reminderIntervalDays
+            : null,
       },
     })
 

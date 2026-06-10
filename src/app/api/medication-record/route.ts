@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       clinicVisits,
       photoUrl,
       nextReminder,
+      reminderIntervalDays,
     } = body as {
       petId?: string
       date?: string
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       clinicVisits?: unknown[]
       photoUrl?: string
       nextReminder?: string
+      reminderIntervalDays?: number
     }
 
     if (!petId || !date) {
@@ -96,6 +98,11 @@ export async function POST(request: NextRequest) {
         clinicVisits: JSON.stringify(clinicVisits ?? []),
         photoUrl: photoUrl ?? null,
         nextReminder: nextReminder ? new Date(nextReminder) : null,
+        // 週期天數僅在 > 0 時保存；0 或負值視為一次性（null）
+        reminderIntervalDays:
+          typeof reminderIntervalDays === 'number' && reminderIntervalDays > 0
+            ? reminderIntervalDays
+            : null,
       },
     })
 

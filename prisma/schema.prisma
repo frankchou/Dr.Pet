@@ -21,9 +21,26 @@ model User {
   accounts          Account[]
   petMemberships    PetMember[]
   sentInvitations   PetInvitation[] @relation("InvitedBy")
+  pushSubscriptions PushSubscription[]
 
   // 原有 relation
   pets          Pet[]
+}
+
+// Web Push 訂閱（一個使用者可在多個裝置/瀏覽器訂閱，1 User : N Subscription）。
+// 推播偏好開關放訂閱層級：不同裝置可有不同行為，退訂只需刪該 endpoint。
+model PushSubscription {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint         String   @unique // 瀏覽器 push service 的唯一端點，天然去重鍵（upsert by endpoint）
+  p256dh           String            // 客戶端公鑰（加密用）
+  auth             String            // 客戶端 auth secret
+  foodAlertEnabled Boolean  @default(true) // 食安警報推播開關
+  reminderEnabled  Boolean  @default(true) // 用藥/美容提醒推播開關
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Account {
@@ -337,6 +354,8 @@ model MedicationRecord {
   clinicVisits  String    @default("[]") // JSON array
   photoUrl      String?   // 藥袋/收據照片
   nextReminder  DateTime?
+  // 提醒週期：null = 一次性（推完清 nextReminder）、>0 = 每 N 天循環（推完 nextReminder += N）
+  reminderIntervalDays Int?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -358,6 +377,8 @@ model GroomingRecord {
   customName        String?
   photoUrl          String?
   nextReminder      DateTime?
+  // 提醒週期：null = 一次性（推完清 nextReminder）、>0 = 每 N 天循環（推完 nextReminder += N）
+  reminderIntervalDays Int?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }
@@ -423,5 +444,9 @@ model NewsArticle {
   sourceName  String?
   publishedAt DateTime?
   isUrgent    Boolean   @default(false)
+  // 食安警報涉及的廠商/品牌/產品關鍵詞（JSON string array），供個人化頭條比對 PetProduct 用
+  affectedBrands    String?
+  // 已觸發食安推播的時間戳；非 null 代表此文章已推過，防止重複推播（同文章只推一次）
+  foodAlertPushedAt DateTime?
   createdAt   DateTime  @default(now())
 }

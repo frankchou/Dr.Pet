@@ -23,6 +23,7 @@ interface PetFormState {
 
 import { DEFAULT_RECORD_PARAMS } from '@/hooks/useRecordParams'
 import type { RecordParam } from '@/hooks/useRecordParams'
+import PushSettings from '@/components/settings/PushSettings'
 
 const PARAM_GROUPS: Array<{ key: 'shortcuts' | 'daily' | 'symptoms'; label: string }> = [
   { key: 'shortcuts', label: '快捷紀錄' },
@@ -612,7 +613,7 @@ function PetCard({ pet, onUpdate, onSave, onCancel, saving, onPersistAvatar }: P
 // ─── 主頁面 ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'profile' | 'params'>('profile')
+  const [tab, setTab] = useState<'profile' | 'params' | 'notify'>('profile')
   const [pets, setPets] = useState<PetFormState[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -809,6 +810,14 @@ export default function SettingsPage() {
         >
           紀錄參數設定
         </button>
+        <button
+          onClick={() => setTab('notify')}
+          className={`flex-1 py-2 rounded-full text-sm font-bold transition-all ${
+            tab === 'notify' ? 'bg-[#111111] shadow-sm text-white' : 'text-slate-500 hover:text-black'
+          }`}
+        >
+          通知設定
+        </button>
       </div>
 
       {/* Tab 1: 毛孩檔案 */}
@@ -914,6 +923,13 @@ export default function SettingsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Tab 3: 通知設定 */}
+      {tab === 'notify' && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <PushSettings />
         </div>
       )}
 

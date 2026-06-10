@@ -18,3 +18,14 @@ export function isDemoUser(session: Session | null): boolean {
   if (!user) return false
   return user.id === DEMO_USER_ID || user.email === DEMO_EMAIL
 }
+
+/**
+ * 是否為 demo 帳號的 userId。
+ *
+ * 用於只拿得到 userId（而非整個 session）的流程，例如推播發送
+ * （sendPushToUser）與食安觸發。demo 帳號的推播一律改送固定 mock 內容，
+ * 故發送前需以此分流。
+ */
+export function isDemoUserId(userId: string): boolean {
+  return userId === DEMO_USER_ID
+}

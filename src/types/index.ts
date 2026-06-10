@@ -124,5 +124,9 @@ export interface NewsArticle {
   sourceName?: string | null
   publishedAt?: Date | string | null
   isUrgent: boolean
+  // 食安警報涉及的廠商/品牌/產品關鍵詞（JSON string array），供個人化頭條比對
+  affectedBrands?: string | null
+  // 已觸發食安推播的時間戳，非 null = 已推
+  foodAlertPushedAt?: Date | string | null
   createdAt: Date | string
 }

@@ -7,16 +7,24 @@ import AppShell from '@/components/layout/AppShell'
 export const metadata: Metadata = {
   title: 'PurePaw 無敏毛孩',
   description: '專屬台灣毛孩的 AI 寵物營養健康管理平台',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: '/app-logo.png',
     apple: '/app-logo.png',
     shortcut: '/app-logo.png',
   },
+  appleWebApp: {
+    capable: true,
+    title: '無敏毛孩 PurePaw',
+    statusBarStyle: 'default',
+  },
 }
 
 // viewportFit: 'cover' 讓 env(safe-area-inset-*) 生效（手機 bottom-sheet modal 底部安全區，見待辦 2-6）
+// themeColor 用品牌色，搭配 PWA manifest 讓加入主畫面/standalone 體驗一致
 export const viewport: Viewport = {
   viewportFit: 'cover',
+  themeColor: '#C4714A',
 }
 
 export default function RootLayout({
