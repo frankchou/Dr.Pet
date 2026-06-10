@@ -134,9 +134,12 @@ export const DEMO_ANALYSIS: DemoAnalysisShape = {
     {
       productId: 'demo-prod-1',
       productName: PROD1,
+      // demo 示意值（mock）：補齊粗纖維、水分，使營養表 7 項標準營養素皆有資料
       facts: [
         { name: '粗蛋白', value: 26, unit: '%' },
         { name: '粗脂肪', value: 14, unit: '%' },
+        { name: '粗纖維', value: 3, unit: '%' },
+        { name: '水分', value: 10, unit: '%' },
         { name: '鈣', value: 1.3, unit: '%' },
         { name: '磷', value: 1.0, unit: '%' },
       ],
@@ -144,8 +147,11 @@ export const DEMO_ANALYSIS: DemoAnalysisShape = {
     {
       productId: 'demo-prod-2',
       productName: PROD2,
+      // demo 示意值（mock）：罐頭水分高，補齊水分、粗纖維示意
       facts: [
         { name: '粗蛋白', value: 12, unit: '%' },
+        { name: '粗纖維', value: 1, unit: '%' },
+        { name: '水分', value: 72, unit: '%' },
         { name: '鈉', value: 0.6, unit: '%' },
         { name: '磷', value: 0.7, unit: '%' },
       ],

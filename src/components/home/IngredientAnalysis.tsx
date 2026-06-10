@@ -751,8 +751,10 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
               </p>
             </div>
           ) : (() => {
-            // 聚合所有產品的營養素（同名加總，記錄來源）
-            // 門檻採 /analysis 完整規則（7 種、犬貓各自 min/warn），依當前寵物 species 取對應組。
+            // 純聯集（frank 原始邏輯）：營養表只列「該毛孩所有產品實際有的營養素聯集」。
+            // 同名加總、不同全列；有幾種就列幾種，產品沒有的不補列。
+            // 門檻採 /analysis 完整規則（犬貓各自 min/warn），依當前寵物 species 取對應組；
+            // 有對應門檻者做雙向示警（偏高/不足），無對應門檻者狀態顯示「—」，照常列出合計值。
             const speciesKey = resolveSpecies(pet.species)
             type MergedNutrient = { name: string; total: number; unit: string; sources: string[] }
             const merged: Record<string, MergedNutrient> = {}
@@ -766,14 +768,22 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
                 if (!merged[f.name].sources.includes(sourceName)) merged[f.name].sources.push(sourceName)
               }
             }
-            // 對每個營養素同時判斷偏高（>warn）與偏低（<min），介於之間為正常；無門檻者狀態為「—」。
-            const rows = Object.values(merged).map(r => {
-              const t = NUTRIENT_THRESHOLDS[r.name]?.[speciesKey]
+            type NutriRow = {
+              name: string
+              total: number
+              unit: string
+              sources: string[]
+              hasThreshold: boolean
+              high: boolean
+              low: boolean
+              range: string
+            }
+            const rows: NutriRow[] = Object.values(merged).map((m) => {
+              const t = NUTRIENT_THRESHOLDS[m.name]?.[speciesKey]
               const hasThreshold = !!t
-              const high = !!(t?.warn != null && r.total > t.warn)
-              const low = !high && !!(t?.min != null && r.total < t.min)
-              const range = formatRange(t)
-              return { ...r, hasThreshold, high, low, range }
+              const high = !!(t?.warn != null && m.total > t.warn)
+              const low = !high && !!(t?.min != null && m.total < t.min)
+              return { name: m.name, total: m.total, unit: m.unit, sources: m.sources, hasThreshold, high, low, range: formatRange(t) }
             })
             const withNutrition = nutritionByProduct.filter(p => (p.facts?.length ?? 0) > 0)
             return (
@@ -826,7 +836,7 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
                     </tbody>
                   </table>
                   <p className="text-[11px] font-medium text-slate-400 px-4 py-3">
-                    * 門檻依{speciesKey === 'cat' ? '貓' : '犬'}的 AAFCO 標準對照；無對照標準的營養素僅顯示合計值（狀態「—」），可透過 AI 分析獲得建議
+                    * 表格列出該毛孩所有產品實際標示的營養素（同名加總）。門檻依{speciesKey === 'cat' ? '貓' : '犬'}的 AAFCO 標準對照；無對照標準的營養素僅顯示合計值（狀態「—」），可透過 AI 分析獲得建議
                   </p>
                 </div>
               </>
@@ -924,6 +934,7 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
           <div className="bg-white rounded-2xl border border-slate-100 p-4">
             <p className="font-bold text-slate-800 mb-2 text-sm">說明</p>
             <ul className="text-xs font-medium text-slate-500 leading-relaxed space-y-1">
+              <li>· 表格列出該毛孩所有產品實際標示的營養素，同名加總、有幾種列幾種</li>
               <li>· 合計值為各產品標示值直接加總，代表最高負荷上限估算，實際依產品說明為準</li>
               <li>· <span className="text-[#C2410C] font-bold">橘色/警示</span>：合計超過 AAFCO 建議上限</li>
               <li>· <span className="text-[#1D4ED8] font-bold">藍色/不足</span>：標示加總低於 AAFCO 最低需求，僅供參考</li>
