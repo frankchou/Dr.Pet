@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
+import FeedbackModal from '@/components/feedback/FeedbackModal'
+import ReviewModal from '@/components/feedback/ReviewModal'
 
 const HEADER_META: Record<string, [string, string]> = {
   '/':             ['總覽',      '讓我們來看看今天的營養狀況吧'],
@@ -43,6 +45,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [pets, setPets] = useState<{ id: string; name: string }[]>([])
   const [currentPetId, setCurrentPetId] = useState('')
   const [showMenu, setShowMenu] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [showReview, setShowReview] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // All hooks must be before any conditional return
@@ -170,6 +174,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <span className="text-sm font-bold">設定</span>
                       </button>
                       <button
+                        onClick={() => { setShowMenu(false); setShowFeedback(true) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-slate-700"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span className="text-sm font-bold">問題回報</span>
+                      </button>
+                      <button
+                        onClick={() => { setShowMenu(false); setShowReview(true) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-slate-700"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width={16} height={16}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        <span className="text-sm font-bold">評論 / 評分</span>
+                      </button>
+                      <button
                         onClick={() => signOut({ callbackUrl: '/' })}
                         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-red-500"
                       >
@@ -209,6 +227,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile bottom nav */}
         <BottomNav />
       </div>
+
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+      {showReview && <ReviewModal onClose={() => setShowReview(false)} />}
     </div>
   )
 }

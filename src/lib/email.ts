@@ -83,8 +83,9 @@ export async function sendInviteEmail(params: {
   await sendEmail({ to, subject, html })
 }
 
-/** 產品資料錯誤回報收件信箱（系統內部通知用）。 */
+/** 系統內部通知收件信箱（產品錯誤回報 / 使用者問題回報 / 評論皆寄此）。 */
 const PRODUCT_REPORT_RECIPIENT = 'purepaw.notify@gmail.com'
+const INTERNAL_NOTIFY_RECIPIENT = 'purepaw.notify@gmail.com'
 
 /**
  * 產品資料錯誤回報通知信 —— 寄給系統內部信箱。
@@ -152,6 +153,104 @@ function buildProductReportHtml(params: {
       </div>
     </div>
   </div>`
+}
+
+/**
+ * 使用者問題回報通知信 —— 寄給系統內部信箱。
+ * 主旨依環境加前綴（appEnvLabel）：本機 / 測試 → `[測試]`、正式 → `[正式]`。
+ */
+export async function sendFeedbackEmail(params: {
+  reporterUserId: string
+  isDemo: boolean
+  category: string | null
+  content: string
+}): Promise<void> {
+  const envPrefix = appEnvLabel()
+  const subject = `${envPrefix} PurePaw 使用者問題回報`
+  const html = buildFeedbackHtml({ ...params, envPrefix })
+  await sendEmail({ to: INTERNAL_NOTIFY_RECIPIENT, subject, html })
+}
+
+/**
+ * 使用者評論／評分通知信 —— 寄給系統內部信箱。
+ * 主旨依環境加前綴（appEnvLabel）：本機 / 測試 → `[測試]`、正式 → `[正式]`。
+ */
+export async function sendAppReviewEmail(params: {
+  reporterUserId: string
+  isDemo: boolean
+  rating: number
+  comment: string | null
+}): Promise<void> {
+  const envPrefix = appEnvLabel()
+  const subject = `${envPrefix} PurePaw 使用者評論`
+  const html = buildAppReviewHtml({ ...params, envPrefix })
+  await sendEmail({ to: INTERNAL_NOTIFY_RECIPIENT, subject, html })
+}
+
+/** 通知信用的兩欄表格列（與產品回報信一致的視覺）。 */
+function notifyRow(label: string, value: string): string {
+  return `<tr>
+      <td style="padding:8px 0;font-size:13px;color:#8B7355;width:120px;vertical-align:top;">${label}</td>
+      <td style="padding:8px 0;font-size:14px;color:#2C1810;font-weight:600;white-space:pre-wrap;">${value}</td>
+    </tr>`
+}
+
+/** 通知信外殼（標題列 + 內容），content 已是組好的 HTML 片段。 */
+function buildNotifyShell(headerTitle: string, intro: string, tableRows: string): string {
+  return `
+  <div style="margin:0;padding:24px;background:#FAF7F2;font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
+    <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <div style="background:${BRAND};padding:24px;text-align:center;">
+        <div style="font-size:18px;font-weight:700;color:#ffffff;">${headerTitle}</div>
+      </div>
+      <div style="padding:28px 28px 32px;">
+        <p style="font-size:14px;color:#2C1810;line-height:1.7;margin:0 0 16px;">${intro}</p>
+        <table style="width:100%;border-collapse:collapse;">${tableRows}</table>
+      </div>
+    </div>
+  </div>`
+}
+
+function buildFeedbackHtml(params: {
+  reporterUserId: string
+  isDemo: boolean
+  category: string | null
+  content: string
+  envPrefix: string
+}): string {
+  // content / category 為使用者輸入，一律跳脫。
+  const content = escapeHtml(params.content)
+  const category = params.category ? escapeHtml(params.category) : '（未分類）'
+  const reporterUserId = escapeHtml(params.reporterUserId)
+  const isDemo = params.isDemo ? '是（demo 帳號）' : '否'
+  const envLabel = escapeHtml(params.envPrefix)
+  const rows =
+    notifyRow('回報者', reporterUserId) +
+    notifyRow('是否 demo', isDemo) +
+    notifyRow('分類', category) +
+    notifyRow('內容', content)
+  return buildNotifyShell(`${envLabel} 使用者問題回報`, '有使用者送出了問題回報，內容如下。', rows)
+}
+
+function buildAppReviewHtml(params: {
+  reporterUserId: string
+  isDemo: boolean
+  rating: number
+  comment: string | null
+  envPrefix: string
+}): string {
+  const safeRating = Math.max(0, Math.min(5, Math.round(params.rating)))
+  const stars = '★'.repeat(safeRating) + '☆'.repeat(5 - safeRating)
+  const comment = params.comment ? escapeHtml(params.comment) : '（無留言）'
+  const reporterUserId = escapeHtml(params.reporterUserId)
+  const isDemo = params.isDemo ? '是（demo 帳號）' : '否'
+  const envLabel = escapeHtml(params.envPrefix)
+  const rows =
+    notifyRow('星等', `${stars}（${safeRating}/5）`) +
+    notifyRow('留言', comment) +
+    notifyRow('評論者', reporterUserId) +
+    notifyRow('是否 demo', isDemo)
+  return buildNotifyShell(`${envLabel} 使用者評論`, '有使用者送出了 App 評論，內容如下。', rows)
 }
 
 function buildInviteHtml(params: {

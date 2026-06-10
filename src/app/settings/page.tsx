@@ -24,6 +24,10 @@ interface PetFormState {
 import { DEFAULT_RECORD_PARAMS } from '@/hooks/useRecordParams'
 import type { RecordParam } from '@/hooks/useRecordParams'
 import PushSettings from '@/components/settings/PushSettings'
+import AppReviewsList from '@/components/feedback/AppReviewsList'
+
+// 公開評論列表（選項二）旗標：預設隱藏，未來開為 true 即在設定頁顯示公開評論與平均星等。
+const SHOW_PUBLIC_REVIEWS: boolean = false
 
 const PARAM_GROUPS: Array<{ key: 'shortcuts' | 'daily' | 'symptoms'; label: string }> = [
   { key: 'shortcuts', label: '快捷紀錄' },
@@ -930,6 +934,14 @@ export default function SettingsPage() {
       {tab === 'notify' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
           <PushSettings />
+        </div>
+      )}
+
+      {/* 公開評論列表（選項二）— 暫時隱藏（SHOW_PUBLIC_REVIEWS），未來開旗標即顯示 */}
+      {SHOW_PUBLIC_REVIEWS && (
+        <div className="mt-8">
+          <h3 className="text-sm font-bold text-slate-800 mb-3">使用者評論</h3>
+          <AppReviewsList />
         </div>
       )}
 

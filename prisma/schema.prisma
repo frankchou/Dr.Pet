@@ -445,6 +445,30 @@ model MealPlanItem {
   createdAt      DateTime      @default(now())
 }
 
+// 使用者問題回報（使用者選單「問題回報」modal）。
+// 不綁 Pet，只記回報者 userId；category 為選填分類；status 預設 pending。
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String
+  category  String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+}
+
+// 使用者 App 評論／評分（使用者選單「評論／評分」modal）。
+// rating 1-5；comment 選填；isPublic 控制是否進入公開評論列表（預設不公開）；
+// status 預設 pending 供日後審核。
+model AppReview {
+  id        String   @id @default(cuid())
+  userId    String
+  rating    Int
+  comment   String?
+  isPublic  Boolean  @default(false)
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+}
+
 // AI 生成的寵物健康快訊
 model NewsArticle {
   id          String    @id @default(cuid())
