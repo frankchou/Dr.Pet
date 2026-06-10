@@ -337,6 +337,10 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
   const [expandProd, setExpandProd] = useState<number>(0)
   const [data, setData] = useState<AnalysisData | null>(null)
   const [loading, setLoading] = useState(false)
+  // 區分「無資料(空狀態)」與「載入失敗(可重試錯誤)」：
+  // status='empty' → 尚無產品（後端回 422），顯示空狀態引導；
+  // status='error' → 網路 / 伺服器錯誤，顯示錯誤提示並可重試。
+  const [fetchStatus, setFetchStatus] = useState<'idle' | 'empty' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [refreshCount, setRefreshCount] = useState(0)
   const [nutritionAi, setNutritionAi] = useState<NutritionAiResult | null>(null)
@@ -347,19 +351,25 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
     if (!petId) return
     setLoading(true)
     setErrorMsg(null)
+    setFetchStatus('idle')
     fetch(`/api/analysis?petId=${petId}`)
       .then(async (res) => {
         const json = await res.json() as AnalysisData | { error: string }
         if (!res.ok || 'error' in json) {
-          setErrorMsg(('error' in json ? json.error : null) ?? '分析失敗，請稍後再試')
+          const message = ('error' in json ? json.error : null) ?? '分析失敗，請稍後再試'
+          setErrorMsg(message)
           setData(null)
+          // 422 = 尚無使用中產品，屬「空狀態」而非載入失敗；其餘狀態碼皆視為錯誤。
+          setFetchStatus(res.status === 422 ? 'empty' : 'error')
         } else {
           setData(json as AnalysisData)
+          setFetchStatus('idle')
         }
       })
       .catch(() => {
         setErrorMsg('網路錯誤，請稍後再試')
         setData(null)
+        setFetchStatus('error')
       })
       .finally(() => setLoading(false))
   }, [petId, refreshCount])
@@ -385,8 +395,39 @@ export default function IngredientAnalysis({ petId }: { petId: string }) {
     )
   }
 
-  // ── 無產品 / 錯誤狀態 ─────────────────────────────────────────────────────
-  if (errorMsg || !data) {
+  // ── 載入失敗狀態（網路 / 伺服器錯誤）：明確區分於「無資料」，提供重試 ──────
+  if (fetchStatus === 'error') {
+    return (
+      <div className="mt-10">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shadow-sm border border-slate-100">
+            <IconClipboardList />
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">營養綜合分析表</h2>
+        </div>
+        <div className="bg-white rounded-[28px] border-2 border-slate-900/5 shadow-sm p-6 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-[#FEF2F2] flex items-center justify-center text-[#DC2626] text-2xl">
+            <IconOctagonAlert size={24} />
+          </div>
+          <p className="font-bold text-slate-800">
+            {errorMsg ?? '分析載入失敗'}
+          </p>
+          <p className="text-sm font-medium text-slate-400 leading-relaxed">
+            載入分析時發生問題，請稍後再試
+          </p>
+          <button
+            onClick={() => setRefreshCount(c => c + 1)}
+            className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#D98A53] border border-slate-200 rounded-full px-4 py-2"
+          >
+            <IconRefreshCw size={13} /> 重新整理
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 無資料狀態（尚無使用中產品 / 後端 422）：空狀態引導，非錯誤 ──────────────
+  if (!data) {
     return (
       <div className="mt-10">
         <div className="flex items-center gap-2 mb-4">

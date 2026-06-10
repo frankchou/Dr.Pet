@@ -192,18 +192,18 @@ const MOCK_DIET_ANALYSIS: DietAnalysisResult = {
     { type: 'warning', message: '磷含量過高 (1.4%)' },
     { type: 'warning', message: '水分不足 (60%)' },
   ],
-  expertComment: '學理分析示磷值達臨界，應增水代謝。同步官方通報無警示批次，請安心餵食。',
+  expertComment: '從學理觀察，磷值偏高、整體水分也略少，平時可留意補水。官方通報目前無相關警示批次。本評語僅供飲食參考，實際狀況請以獸醫師評估為準。',
   swapRecommendations: [
     {
       session: 'morning',
       currentItem: '自然本色小型成犬 亮白無穀鮭魚',
-      reason: '磷偏高恐傷腎',
+      reason: '磷偏高，腎臟保健可留意',
       alternatives: [{ name: '健康低磷鮮燉罐', reason: '無膠特調控磷配比' }],
     },
     {
       session: 'evening',
       currentItem: '自然本色亮白無穀鮭魚',
-      reason: '鈉偏高腎臟負擔',
+      reason: '鈉偏高，腎臟負擔建議留意',
       alternatives: [{ name: '黃金南瓜鮮蒸雞肉', reason: '鉀離子含量優防脫' }],
     },
   ],
@@ -357,14 +357,18 @@ function SessionAccordion({
 
   const meta = SESSION_META[session]
 
-  const handleDelete = async (itemId: string) => {
+  // 刪除配餐項目：樂觀更新先移除 UI，DELETE 失敗則還原該項目並提示，
+  // 與數量編輯（handleQuantityChange）的回滾模式一致。
+  const handleDelete = async (item: MealPlanItem) => {
     if (!planId) return
-    setDeletingId(itemId)
+    setDeletingId(item.id)
+    onItemDeleted(item.id)
     try {
-      await fetch(`/api/meal-plans/${planId}/items?itemId=${itemId}`, { method: 'DELETE' })
-      onItemDeleted(itemId)
+      const res = await fetch(`/api/meal-plans/${planId}/items?itemId=${item.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('delete failed')
     } catch {
-      // 靜默降級
+      onItemAdded(item)
+      alert('刪除項目失敗，請稍後再試')
     } finally {
       setDeletingId(null)
     }
@@ -494,7 +498,7 @@ function SessionAccordion({
                         />
                         <span className="text-sm text-slate-500 font-medium w-7">{item.unit}</span>
                         <button
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDelete(item)}
                           disabled={deletingId === item.id}
                           className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-40"
                           aria-label="刪除此項目"
@@ -1052,7 +1056,7 @@ function AiAnalysisResult({ result, petId }: AiAnalysisResultProps) {
           {activeTab === 'swap' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-600 leading-relaxed">
-                🔍 診斷：早、中、晚三餐成分中，以下商品建議更換，幫助毛孩遠離健康風險。
+                🔍 飲食參考：早、中、晚三餐成分中，以下商品可考慮更換，幫助毛孩降低潛在飲食風險。如有疑慮，建議諮詢獸醫師。
               </p>
               {result.swapRecommendations.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">目前配餐無需替換建議</p>

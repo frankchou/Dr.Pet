@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { appEnvLabel } from '@/lib/env'
 
 /**
  * 寄信模組 —— 目前走 Gmail SMTP + 應用程式密碼（系統專用帳號）。
@@ -88,8 +89,8 @@ const PRODUCT_REPORT_RECIPIENT = 'purepaw.notify@gmail.com'
 /**
  * 產品資料錯誤回報通知信 —— 寄給系統內部信箱。
  *
- * 主旨依環境加前綴區分：DATABASE_URL 以 `file:` 開頭（本機 / 測試 SQLite）→ `[測試]`，
- * 否則（正式 Turso）→ `[正式]`，避免測試回報混進正式通知。
+ * 主旨依環境加前綴區分（appEnvLabel）：本機 / 測試 → `[測試]`、正式 → `[正式]`，
+ * 避免測試回報混進正式通知。
  */
 export async function sendProductErrorReportEmail(params: {
   productName: string
@@ -100,7 +101,7 @@ export async function sendProductErrorReportEmail(params: {
   note: string | null
 }): Promise<void> {
   const { productName, brand, productId, reporterUserId, isDemo, note } = params
-  const envPrefix = process.env.DATABASE_URL?.startsWith('file:') ? '[測試]' : '[正式]'
+  const envPrefix = appEnvLabel()
   // 主旨去除換行並截長，防 header injection（與內文 escapeHtml 跳脫一致）
   const safeName = productName.replace(/[\r\n]+/g, ' ').slice(0, 120)
   const subject = `${envPrefix} PurePaw 產品資料錯誤回報：${safeName}`
