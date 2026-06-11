@@ -45,3 +45,7 @@ next-env.d.ts
 
 # 政府 API 原始資料 dump（可從官方 OpenData 重抓，不進 git）
 docs/govAPI_spec/*.json
+
+# 政府 API 資料快照（會過期，正式靠定期重抓，不進 git）
+docs/govAPI_spec/*.json
+docs/govAPI_spec/govAPI_audit_data/
