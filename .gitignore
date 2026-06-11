@@ -49,3 +49,6 @@ docs/govAPI_spec/*.json
 # 政府 API 資料快照（會過期，正式靠定期重抓，不進 git）
 docs/govAPI_spec/*.json
 docs/govAPI_spec/govAPI_audit_data/
+docs/govAPI_spec/govAPI_audit_data/
+__pycache__/
+*.pyc
