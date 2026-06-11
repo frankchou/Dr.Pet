@@ -42,3 +42,6 @@ next-env.d.ts
 
 /src/generated/prisma
 .claude/
+
+# 政府 API 原始資料 dump（可從官方 OpenData 重抓，不進 git）
+docs/govAPI_spec/*.json

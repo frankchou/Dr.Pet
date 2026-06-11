@@ -1,0 +1,48 @@
+查到了。我用 Claude in Chrome 載入頁面並攔截網路請求,結果如下:
+這頁是 Vue 3 SPA,HTML 本身沒有資料,前端用 axios 在載入/查詢時 POST 到三支 ASP.NET Handler 取得 JSON:
+分頁API 端點請求 body檢驗不合格產品結果/Handler/Web/FailedInspectionHandler.ashx{"Method":"FailedInspectionData","Param":{"action":"getFailedInspectionFood","currentPage":1,"pageSize":10,"orderByColumn":"PostDate","sortDirection":"desc","PostSDate":"2025/12/11","PostEDate":"2026/06/11","K_Delete":"0","County":"","KeyWord":""}}檢驗結果/Handler/Web/InspectionHandler.ashx{"Method":"InspectionData","Param":{"action":"getInspectionData","Year":2026,"Month":4,"EYear":2026,"EMonth":4,"County":"","KeyWord":"","currentPage":1,"pageSize":10,"orderByColumn":"SortDate","sortDirection":"ASC","dataType":0}}查核結果/Handler/Web/ExamineHandler.ashx{"Method":"ExamineData","Param":{"action":"getExamineData","Year":2026,"Month":4,"EYear":2026,"EMonth":4,"CountyName":"","KeyWord":"","currentPage":1,"pageSize":100,"dataType":0}}
+關鍵細節:
+
+必帶兩個 header:Content-Type: application/json 和 X-Requested-With: XMLHttpRequest。少了後者伺服器會回 {"Success":false,"Message":"傳輸的資料為空"}(我實測過)。
+回應格式:{"Success":true,"Message":"<JSON字串化的資料陣列>","RowCount":..,"totalSize":..},Message 要再 JSON.parse 一次。
+欄位含 County、GovName(如高雄市動物保護處)、CompanyName、FoodName、MFDate、EXPDate、InspectionMethod、ReasonAndAmount、DisposalSituation、PostDate,縮圖直接以 FileBase64string 內嵌 base64 圖片。
+
+也就是說資料來源是農業部寵物食品申報網自家的後端資料庫(各縣市動保機關查核/檢驗後發布),透過這三支 .ashx handler 吐 JSON 給前端,沒有公開的 OpenData API,但這些端點不需登入、帶對 header 就能直接呼叫。
+
+技術上完全可行。我剛才已實測:這三支 .ashx 端點不需登入、不需 token、沒有 CSRF 驗證,只要帶對兩個 header 就會回 JSON。
+直接打 API(抓「檢驗不合格/檢驗/查核」唯一的方法)
+bashcurl -X POST 'https://petfood.moa.gov.tw/Handler/Web/FailedInspectionHandler.ashx' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -d '{"Method":"FailedInspectionData","Param":{"action":"getFailedInspectionFood","currentPage":1,"pageSize":100,"orderByColumn":"PostDate","sortDirection":"desc","PostSDate":"2020/01/01","PostEDate":"2026/06/11","K_Delete":"0","County":"","KeyWord":""}}'
+實作注意事項:
+
+兩個 header 缺一不可,少了會回 傳輸的資料為空。
+回應的 Message 是「JSON 字串」,要再 parse 一次才是資料陣列。
+每筆都內嵌 FileBase64string 縮圖,資料量很大(9 筆就 10MB),建議抓回後把圖另存或丟棄,別整包進 DB。
+EXPDate: "1900/01/01" 代表無效期,要自己處理。
+日期區間放寬(如 2020 起)可一次抓到歷史資料;檢驗/查核結果那兩支是用 Year/Month 參數,要逐月或逐年迭代。
+
+風險與替代方案:
+
+這不是官方公開 API,沒有文件、沒有穩定性承諾,改版欄位或路徑可能隨時變(網址從 coa.gov.tw 換成 moa.gov.tw 就是前例)。建議排程低頻抓取(每天一次足夠,發布頻率很低)、加上錯誤告警。
+「檢驗不合格/查核結果」目前沒有對應的政府開放資料集,所以打這些端點是唯一程式化途徑。
+但「寵物食品基本資料」和「業者資料」有官方開放資料 JSON,更穩定,該用就用官方的:寵物食品資料、寵物食品業者資料(授權為政府資料開放授權條款,可自由介接)。
+
+合法性方面:這是政府主動公開的資訊,合理頻率抓取一般沒問題;避免高頻轟炸即可。
+
+抓資料腳本：docs/govAPI_spec/govAPI_audit_script/petfood_scraper.py 
+經過瀏覽器裡實測了三支 API 的真實回應結構,腳本是照實測結果寫的:
+
+檢驗不合格:目前共 41 筆(2015 起),RowCount 欄位不可靠,腳本以實際筆數判斷翻頁結束
+檢驗結果:約 4,860 筆,總數藏在每筆資料的 TotalCount 欄位
+查核結果:回應是巢狀物件(_ExamList 清單 + _ExamResultList 逐項明細,用 Year+Month+ESort 關聯),腳本拆成兩張表
+
+Header 部分(你問的重點):
+Content-Type: application/json
+X-Requested-With: XMLHttpRequest
+就這兩個,缺一不可,少了會回 {"Success":false,"Message":"傳輸的資料為空"}。不需要 cookie 或 token。
+執行方式:
+pip install requests pandas openpyxl
+python petfood_scraper.py --out data
+會輸出 4 個 CSV + 1 個 Excel(四個工作表)+ 不合格產品縮圖。每個請求間隔 0.5 秒,對伺服器友善。要接到你自己的系統,把 main() 換成寫入你的 DB 即可,三個 fetch_* 函式可直接重用。
