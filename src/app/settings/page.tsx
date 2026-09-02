@@ -644,8 +644,10 @@ export default function SettingsPage() {
         sex: string; birthday?: string | null; weight?: number | null;
         isNeutered: boolean; avatar?: string | null;
       }[]) => {
+        // 401（未登入 / session 過期）回傳的是 { error }，先正規化避免當成陣列操作
+        const list = Array.isArray(data) ? data : []
         setPets(
-          data.map(p => ({
+          list.map(p => ({
             id: p.id,
             name: p.name,
             species: p.species,
@@ -939,6 +941,22 @@ export default function SettingsPage() {
           <AppReviewsList />
         </div>
       )}
+
+      {/* 法律文件連結 —— 所有 tab 共用，置於頁面底部 */}
+      <div className="mt-8 pt-6 border-t border-slate-100">
+        <div className="flex items-center justify-center gap-3 text-xs font-bold text-slate-400">
+          <Link href="/privacy" className="hover:text-[#C4714A] transition-colors">
+            隱私權政策
+          </Link>
+          <span className="text-slate-200">·</span>
+          <Link href="/terms" className="hover:text-[#C4714A] transition-colors">
+            服務條款
+          </Link>
+        </div>
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
+          本服務為資訊整理與衛教參考，不具醫療診斷效力，無法取代專業獸醫師之診斷與處置。
+        </p>
+      </div>
 
       {/* Toast 通知 */}
       {toast && <Toast message={toast} />}

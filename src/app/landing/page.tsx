@@ -473,9 +473,17 @@ export default function LandingPage() {
               </svg>
               <span className="font-bold">PurePaw 無敏毛孩</span>
             </div>
-            <Link href="/" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
-              登入系統 →
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
+                隱私權政策
+              </Link>
+              <Link href="/terms" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
+                服務條款
+              </Link>
+              <Link href="/" className="text-sm font-bold text-slate-600 hover:text-black transition-colors">
+                登入系統 →
+              </Link>
+            </div>
           </div>
           <p className="text-xs font-medium text-slate-400 leading-relaxed max-w-3xl mb-3">
             <strong className="text-slate-500">免責聲明：</strong>

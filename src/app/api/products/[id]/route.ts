@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: { usages: true },
-    })
+    // 不再 include usages：ProductUsage 屬於各毛孩的私人紀錄（petId / notes），
+    // 而 Product 是全站共用資料，帶出來等於跨帳號外洩；唯一呼叫端（產品編輯）也用不到。
+    const product = await prisma.product.findUnique({ where: { id } })
     if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(product)
   } catch (error) {
@@ -24,6 +29,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await request.json()
     const { type, name, brand, variant, ingredientText, ingredientJson } = body
@@ -57,9 +67,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
-    // Cascade delete: remove usages first, then product
-    await prisma.productUsage.deleteMany({ where: { productId: id } })
+
+    // Product 為全站共用資料，刪除會連帶清掉其他飼主的使用紀錄。
+    // 在導入產品擁有者模型前，只允許刪除「無人使用」的產品，避免跨帳號破壞。
+    const usageCount = await prisma.productUsage.count({ where: { productId: id } })
+    const petProductCount = await prisma.petProduct.count({ where: { productId: id } })
+    if (usageCount > 0 || petProductCount > 0) {
+      return NextResponse.json(
+        { error: '此產品已被使用中，無法刪除' },
+        { status: 409 }
+      )
+    }
+
     await prisma.product.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {

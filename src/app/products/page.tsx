@@ -64,11 +64,13 @@ export default function ProductsPage() {
   // ── Load pets ────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/pets').then(r => r.json()).then((data: Pet[]) => {
-      setPets(data)
+      // 401（未登入 / session 過期）回傳的是 { error }，先正規化避免當成陣列操作
+      const list = Array.isArray(data) ? data : []
+      setPets(list)
       const stored = localStorage.getItem('drpet_currentPetId')
-      const first = stored && data.find(p => p.id === stored) ? stored : data[0]?.id
+      const first = stored && list.find(p => p.id === stored) ? stored : list[0]?.id
       if (first) setCurrentPetId(first)
-    })
+    }).catch(() => setPets([]))
   }, [])
 
   // ── Load pet's product list ───────────────────────────────────────────────────

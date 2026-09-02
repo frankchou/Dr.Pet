@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { auth } from '@/lib/auth'
+import { saveUploadedImage } from '@/lib/storage'
 
-function generateUniqueFilename(originalName: string): string {
-  const ext = path.extname(originalName) || '.jpg'
-  const timestamp = Date.now()
-  const random = Math.random().toString(36).substring(2, 10)
-  return `${timestamp}-${random}${ext}`
-}
-
+// 儲存後端（Vercel Blob / 本機 public/uploads）由 src/lib/storage.ts 依環境分流，
+// 回傳格式維持 { url }，前端 7 個呼叫端不需要調整。
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
+    // 需登入才可上傳：Blob 額度是實際費用，開放匿名等於任何人都能燒流量。
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    if (!file) {
+    const formData = await request.formData()
+    const file = formData.get('file')
+
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    const saved = await saveUploadedImage(file)
+    if (!saved.ok) {
+      return NextResponse.json({ error: saved.error }, { status: saved.status })
+    }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-    await mkdir(uploadDir, { recursive: true })
-
-    const filename = generateUniqueFilename(file.name)
-    const filePath = path.join(uploadDir, filename)
-    await writeFile(filePath, buffer)
-
-    const publicUrl = `/uploads/${filename}`
-    return NextResponse.json({ url: publicUrl }, { status: 201 })
+    return NextResponse.json({ url: saved.url }, { status: 201 })
   } catch (error) {
     console.error('POST /api/upload error:', error)
     return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })

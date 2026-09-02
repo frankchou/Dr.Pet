@@ -5,8 +5,7 @@ import { VET_REFERENCE_SCOPE } from '@/lib/utils'
 import { auth } from '@/lib/auth'
 import { requirePetAccess } from '@/lib/petAccess'
 import { isDemoUser } from '@/lib/demo'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { saveUploadedImage } from '@/lib/storage'
 
 // demo 帳號回固定示意即時判定（不打 AI / Vision）。結構與 AI 路徑的 result 一致。
 const DEMO_INSTANT_RESULT = {
@@ -34,18 +33,16 @@ const ALLOWED_TYPES: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | '
   'image/webp': 'image/webp',
 }
 
-// 將上傳圖片存到 /public/uploads/，回傳可公開存取的路徑；存檔失敗為非致命，回 null。
-async function saveUploadedImage(bytes: ArrayBuffer, rawType: string): Promise<string | null> {
-  try {
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-    await mkdir(uploadsDir, { recursive: true })
-    const ext = rawType.includes('png') ? 'png' : rawType.includes('gif') ? 'gif' : rawType.includes('webp') ? 'webp' : 'jpg'
-    const filename = `instant-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    await writeFile(path.join(uploadsDir, filename), Buffer.from(bytes))
-    return `/uploads/${filename}`
-  } catch {
-    return null
-  }
+// 存下分析用的圖片（線上走 Vercel Blob、本機寫 public/uploads，見 src/lib/storage.ts）。
+// 這裡是非致命路徑：存檔失敗只讓歷史紀錄少一張縮圖，不能中斷分析結果回傳，故一律吞成 null 並留 log。
+// maxBytes 沿用本路由既有的 20MB 上限，避免改變既有可接受的檔案大小。
+const INSTANT_IMAGE_MAX_BYTES = 20 * 1024 * 1024
+
+async function storeInstantImage(file: File): Promise<string | null> {
+  const saved = await saveUploadedImage(file, { prefix: 'instant', maxBytes: INSTANT_IMAGE_MAX_BYTES })
+  if (saved.ok) return saved.url
+  console.warn('[instant-analyze] 圖片儲存失敗（不影響分析結果）:', saved.error)
+  return null
 }
 
 // GET: history list for a pet
@@ -96,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // demo 帳號：回固定示意判定，不打 AI。仍存圖片 + DB 紀錄讓歷史列表正常顯示。
     if (isDemoUser(session)) {
-      const imagePath = await saveUploadedImage(bytes, rawType)
+      const imagePath = await storeInstantImage(file)
       const saved = await prisma.instantAnalysis.create({
         data: {
           petId,
@@ -231,8 +228,8 @@ ${VET_REFERENCE_SCOPE}`
       positives?: { ingredient: string; reason: string }[]
     }
 
-    // Save image to /public/uploads/
-    const imagePath = await saveUploadedImage(bytes, rawType)
+    // Save image (Vercel Blob on deployments / public/uploads locally)
+    const imagePath = await storeInstantImage(file)
 
     // Save to DB
     const saved = await prisma.instantAnalysis.create({

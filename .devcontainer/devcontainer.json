@@ -1,0 +1,34 @@
+{
+  "name": "PurePaw (dev)",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+
+  // 開發環境固定為 dev：只連本機 dev.db，永遠不碰正式 Turso。
+  // 機密值（ANTHROPIC_API_KEY 等）請設在
+  //   GitHub → repo Settings → Secrets and variables → Codespaces
+  // Codespaces 會把它們注入成環境變數，且環境變數優先於 .env，不需手動填。
+  "containerEnv": {
+    "DATABASE_URL": "file:./dev.db",
+    "NEXT_TELEMETRY_DISABLED": "1"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "PurePaw dev server", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Prisma.prisma",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  }
+}

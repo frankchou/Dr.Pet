@@ -29,7 +29,9 @@ function BellIcon() {
   )
 }
 
-const NO_SHELL_PATHS = ['/landing']
+// 不套用 App 外框（Sidebar / BottomNav / header）的路徑。
+// /privacy、/terms 為對外法遵頁，需自帶版面且不依賴登入狀態。
+const NO_SHELL_PATHS = ['/landing', '/privacy', '/terms']
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

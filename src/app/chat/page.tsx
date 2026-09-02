@@ -45,10 +45,12 @@ export default function ChatPage() {
     fetch('/api/pets')
       .then((r) => r.json())
       .then((data: Pet[]) => {
-        setPets(data)
-        if (data.length > 0) {
-          setCurrentPet(data[0])
-          loadHistory(data[0].id)
+        // 401（未登入 / session 過期）回傳的是 { error }，先正規化避免當成陣列操作
+        const list = Array.isArray(data) ? data : []
+        setPets(list)
+        if (list.length > 0) {
+          setCurrentPet(list[0])
+          loadHistory(list[0].id)
         }
       })
       .catch(console.error)

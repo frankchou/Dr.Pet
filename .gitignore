@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 範本檔不含任何真實憑證，必須進版控供新環境參照
+!.env.example
 
 # vercel
 .vercel

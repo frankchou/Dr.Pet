@@ -183,10 +183,12 @@ export default function ScanPage() {
     fetch('/api/pets')
       .then(r => r.json())
       .then((data: Pet[]) => {
+        // 401（未登入 / session 過期）回傳的是 { error }，先正規化避免當成陣列操作
+        const list = Array.isArray(data) ? data : []
         const stored = typeof window !== 'undefined' ? localStorage.getItem('drpet_currentPetId') : null
-        const id = stored && data.find(p => p.id === stored) ? stored : data[0]?.id ?? ''
+        const id = stored && list.find(p => p.id === stored) ? stored : list[0]?.id ?? ''
         setCurrentPetId(id)
-        setPetName(data.find(p => p.id === id)?.name ?? '')
+        setPetName(list.find(p => p.id === id)?.name ?? '')
       })
       .catch(() => { /* 靜默降級 */ })
   }, [])

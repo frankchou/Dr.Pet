@@ -8,6 +8,20 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 import path from 'path'
 
+/**
+ * 只保留協定與 host，用於錯誤訊息——連線字串的 query 可能帶 authToken，
+ * 直接印出等於把正式庫憑證寫進 log。與 src/lib/prisma.ts 的 safeHost() 同一用意。
+ */
+function maskDbUrl(url: string | undefined): string {
+  if (!url) return '(未設定)'
+  try {
+    const parsed = new URL(url)
+    return parsed.host ? `${parsed.protocol}//${parsed.host}` : parsed.protocol
+  } catch {
+    return '(無法解析的 DATABASE_URL)'
+  }
+}
+
 function resolveDbUrl(): string {
   const raw = process.env.DATABASE_URL || `file:${path.join(process.cwd(), 'dev.db')}`
   if (raw.startsWith('file:') && !raw.startsWith('file:/')) {
@@ -20,7 +34,7 @@ function resolveDbUrl(): string {
 // 正式站 DATABASE_URL 指向 Turso（libsql://...），誤跑會把假資料寫進正式庫。
 if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:')) {
   console.error('✋ 中止 seed：DATABASE_URL 不是本機 SQLite（file:）。')
-  console.error(`   目前 DATABASE_URL = ${process.env.DATABASE_URL}`)
+  console.error(`   目前 DATABASE_URL = ${maskDbUrl(process.env.DATABASE_URL)}`)
   console.error('   seed 只允許對本機 dev.db 執行，請改用：')
   console.error('   DATABASE_URL="file:./dev.db" npx prisma db seed')
   process.exit(1)

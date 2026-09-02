@@ -1,6 +1,6 @@
 /**
  * 把所有 Prisma migration SQL 推上 Turso
- * 用法：node scripts/migrate-turso.mjs
+ * 用法：DATABASE_URL="libsql://..." DATABASE_AUTH_TOKEN="..." node scripts/migrate-turso.mjs
  */
 import { createClient } from '@libsql/client'
 import { readFileSync, readdirSync } from 'fs'
@@ -14,6 +14,17 @@ const authToken = process.env.DATABASE_AUTH_TOKEN
 
 if (!url || !authToken) {
   console.error('Missing DATABASE_URL or DATABASE_AUTH_TOKEN in .env')
+  process.exit(1)
+}
+
+// 方向與 src/lib/prisma.ts 的防呆相反：本腳本「只准」對遠端 Turso 執行。
+// devcontainer 的 containerEnv 會把 DATABASE_URL 釘成 file:./dev.db，而 dotenv 不覆蓋
+// 既有環境變數 —— 若不擋，照註解直接跑會靜默地把 migration 套進本機檔案，操作者
+// 卻以為自己在遷移正式庫。正確用法是行內指定：
+//   DATABASE_URL="libsql://..." DATABASE_AUTH_TOKEN="..." node scripts/migrate-turso.mjs
+if (url.startsWith('file:')) {
+  console.error('拒絕執行：DATABASE_URL 指向本機檔案 (' + url + ')，本腳本只能對遠端 Turso 執行。')
+  console.error('請以行內環境變數指定：DATABASE_URL="libsql://..." DATABASE_AUTH_TOKEN="..." node scripts/migrate-turso.mjs')
   process.exit(1)
 }
 

@@ -312,7 +312,9 @@ function LoginPage() {
 }
 
 /* ─── ClientShell（主體）─────────────────────────────────────── */
-const PUBLIC_PATHS = ['/landing', '/invite']
+// 公開路徑：未登入也能瀏覽。/privacy 與 /terms 為法遵頁面，
+// Google OAuth 同意畫面審核會直接開啟網址，必須在未登入狀態可讀。
+const PUBLIC_PATHS = ['/landing', '/invite', '/privacy', '/terms']
 
 export default function ClientShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
